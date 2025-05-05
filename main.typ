@@ -60,9 +60,8 @@
 
 #set align(top + left)
 
-#set page(numbering: none, footer: none, header: none)
-#page(background: image("zadani1.png"), [])
-#page(background: image("zadani2.png"), [])
+#page(numbering: none, footer: none, header: none, background: image("zadani1.png"), [])
+#page(numbering: none, footer: none, header: none, background: image("zadani2.png"), [])
 
 // reset our page counter to ensure they don't interfere with it
 // this depends on your document, you may omit this
@@ -108,7 +107,7 @@ I hereby state that this submitted thesis is my original author work and that I 
 
 #v(4em)
 
-Ostrava, XX. April 2025
+Ostrava, XX. May 2025
 #v(2em)
 
 ………………………………\
@@ -948,6 +947,77 @@ Following arguments were used `~/Projects/bind9/bin/dnssec/dnssec-verify -I raw 
 - Comparison of PQC schemes in terms of key generation, signing, and verification times. 
 - Impact on DNSSEC response times and bandwidth usage. 
 
+== DNS Resolver Benchmarking
+
+In the previous sections, the sizes of the DNS messages and the speed of DNSSEC signing and verification were evaluated.  In this sections, everything will be put together into a DNS Resolver benchmarking test.  Modified BIND 9 with support for the above mentioned algorithms was used for benchmarking.
+
+=== Experiment Setup
+
+BIND 9 team already has a setup for benchmarking DNS Resolver called Shotgun CI that combines GitLab CI @gitlab-ci and DNS Shotgun.
+
+DNS Shotgun @dns-shotgun is a realistic DNS benchmarking tool which supports multiple transport protocols.  It supports UDP, TCP, DNS-over-TLS (DoT), and DNS-over-HTTPS (DoH).  DNS Shotgun is capable of simulating hundreds of thousands of DoT/DoH
+clients and it exports a number of statistics, such as query latencies, number of handshakes and connections, response rate, response codes etc. in JSON format.  The toolchain also provides scripts that can plot these into readable charts.
+
+GitLab CI/CD @gitlab-ci is a tool to provide continuous methods of software development, where you continuously build, test, deploy, and monitor iterative code changes.
+
+Shotgun CI @shotgun-ci combines GitLab CI/CD with DNS Shotgun to provide a convenient way to launch benchmarking over one or multiple git branches.  Each run of the CI can have different parameters.  The following parameters are tunable:
+
+#image("Screenshot 2025-05-05 at 16.09.29.png")
+
+In this experimental setup, the following variables has been altered from their respective defaults:
+
+- `SHOTGUN_TEST_VERSION` was set to a tuple consisting of a base branch and the chosen algorithm branch
+- `SHOTGUN_TRAFFIC_MULTIPLIER` was set to 20 - this corresponds to 186k queries-per-second
+- `SHOTGUN_ROUNDS` was set to 5 repetitions.  As the testing happens on the real internet, there could be fluctuations between individual runs and 5 rounds can smoothen the results.  Additionally, individual results can be then evaluated and outliers can be assessed manually.
+- `SHOTGUN_DURATION` was set to 600 seconds, e.g. 5 minutes.  This allows enough time to fill the cache and test both cold cache and hot cache scenarios with sufficient time and queries.
+- `BIND_EXTRA_CONF` was used to setup custom DNSSEC trust anchors.  The custom trust anchors contain both the current DNSSEC root zone key signing keys (KSK) and a new custom root zone key signing key for each of the tested algorithms.
+
+The Shotgun CI test setup consists of two stages.  The first stage generates the Continuous Integration (CI) configuration based on the given variables, and the second stage spins up enough machines (FIXME: Specification?) in the Amazon AWS Cloud and distributes the individual test runs to each AWS node.  When all the benchmarking runs are finished, a post-processing job collects all the logs from all the benchmarking runs and combines them into single output.  It generates number of charts and also provides a simplified basic view that contains aggregated performance charts (first half of the interval, second half of the interval and the whole interval), memory consumption, CPU load during the benchmark, and performance chart with all benchmarking runs plotted separately.  More charts can be generated based on the data gathered during the benchmarking runs, but for our purposes, these are enough to consider the impact of the PQC algorithms on the DNS Resolver Performance.
+
+==== Logarithmic Percentile Histograms
+
+Bert Hubert and Peter van Dijk @logperfhist have introduced the logarithmic percentile histograms into the DNS world.  In @loghisto, the both axes are logarithmic.  The x-axis show the _slowest_ percentile
+
+#figure(
+  image("log-histo3-Mar-15-2023-07-57-33-7669-AM.png"),
+)<loghisto>
+
+
+The $x$-axis describe the slowest percentiles on a logarithmic scale.  As an example, the $1%$ of the slowest queries can be found at $x=1$.  The matching value on the $y$-axis gives as the average latence of the answers for those $1%$ slowest queries – around 8 milliseconds for KPN fiber in the PowerDNS office, and around 90 milliseconds for the Middle East installation.
+
+Similarly, the $0.01$ percentile of the queries are answered in around $1200$ milliseconds – and that's barely usable time as many DNS clients will already retry the query.
+
+Looking from a different angle, $99.9%$ of queries ($x=0.01$) are answered under 200 milliseconds on the KPN fiber installation.  Such delay can be caused by various factors - some authoritative servers might be slow, down, mis-configured or unresponsive.  Some of the slowness in the DNS ecosystem can't be fixed by the DNS resolvers alone as they are not caused by the inefficiency in the DNS resolver code.
+
+==== Custom Root Zone Server
+
+A single instance of Ubuntu server was created in the same AWS region to minimize the effect of the latency on the results.  A BIND 9.20.8 was installed and configured.  The default configuration was modified to disable recursive DNS queries as this server (`recursion no;`), and maximum EDNS buffer size (e.g. maximum DNS message size over UDP) was bumped to `1452` with `edns-udp-size 1452;` and `max-udp-size 1452`.  Finally, custom root zone was added in a raw (pre-compiled) format.  The final configuration located in standard location `/etc/bind/named.conf` looked like this:
+
+```
+options {
+        directory "/var/cache/bind";
+        dnssec-validation auto;
+        recursion no;
+        edns-udp-size 1452;
+        max-udp-size 1452;
+        trust-anchor-telemetry no;
+};
+
+zone "." in {
+        file "/etc/bind/<algorithm>/db.root.signed";
+        type primary;
+        masterfile-format raw;
+};
+```
+
+==== Test Data
+
+The Shotgun CI uses a real-world data that were gracefully provided by a large-size telecommunication company and sanitized for privacy reasons – IP addresses were anonymized.  The test set reflects a real unfiltered DNS traffic captured from the networking interface of a large DNS resolver and reflects the traffic generated by Internet Service Provider users, various automated traffic, mis-configurations and miscreants (bots, worms, DDoS clients, etc.), e.g. the usual mix of DNS queries as found on the Internet.
+
+=== DNS Resolver Benchmarking Results
+
+
+
 == Compatibility Assessment
 - Challenges in integrating PQC schemes into DNSSEC protocols. 
 - Solutions for maintaining backward compatibility. 
@@ -1356,3 +1426,14 @@ Eyal Ronen
     ),
     caption: [FAEST key and signature sizes in bytes for each security level],
   ) <faest-sizes>
+
+Data 20x:
+  - SQISign:    https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5577905
+  - HAWK-256:   https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5577915
+  - HAWK-512:   https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5577934
+  - MAYO:       https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5577952
+  - ANTRAG:     https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5577983
+  - FALCON-512: https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5577697
+  - RSA2048:    https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5578007
+  - ECDSAP256:  https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5578064
+  - ED25519:    https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5578250
