@@ -1036,9 +1036,9 @@ In addition to the chosen PQC algorithms, the classic algorithms were also teste
 
 When evaluating the latency results, it is important to realize that these results were gathered on the real Internet and there will be slight differences between the individual runs and even between the individual branches.
 
-==== RSASHA256 with 2048-bit keys
+==== RSASHA256 with 2048-bit keys Results
 
-The results in @rsasha256-all-groups-latency-since_0-until_300 and @rsasha256-all-groups-latency-since_300-until_600 show only slight variation in the results.
+In @rsasha256-all-groups-latency-since_0-until_300, the results for a situation when the DNS cache is completely empty (also called Cold Cache) can be observed.  As the cache fills up with the data, the latency gradually improves (smaller is better), and effect of DNS cache (Hot Cache) can be observed in @rsasha256-all-groups-latency-since_300-until_600.  The differences between the normal Root Zone servers and the mock Root Zone server for benchmarking can be observed in this scenario, as the DNSSEC algorithm for both tested branches is the same.
 
 #figure(
   image("rsasha256/_charts-all-groups/all-groups-latency-since_0-until_300.png"),
@@ -1050,7 +1050,7 @@ The results in @rsasha256-all-groups-latency-since_0-until_300 and @rsasha256-al
   caption: [RSASHA256/2048 All Groups Hot Cache Latency],
 )<rsasha256-all-groups-latency-since_300-until_600>
 
-There are also no difference between the tested branches in the CPU in @rsasha256-all-groups-resmon.cpu.usage_percent and memory in @rsasha256-all-groups-resmon.memory.
+The results in @rsasha256-all-groups-latency-since_0-until_300 and @rsasha256-all-groups-latency-since_300-until_600 show only slight variation in the results.
 
 #figure(
   image("rsasha256/_charts-all-groups/all-groups-resmon.cpu.usage_percent.cg-docker.png"),
@@ -1062,7 +1062,25 @@ There are also no difference between the tested branches in the CPU in @rsasha25
   caption: [RSASHA256/2048 All Groups Memory Usage],
 )<rsasha256-all-groups-resmon.memory>
 
-Overall, it can be concluded that the benchmarking methodology is not a source of a difference on its own.
+There are also no differences between the tested branches in the CPU usage in @rsasha256-all-groups-resmon.cpu.usage_percent and also no difference in memory usage as observed in @rsasha256-all-groups-resmon.memory.
+
+Overall, it can be concluded that the benchmarking methodology and the setup is not a source of a difference on its own.
+
+==== ECDSA-P256-SHA256
+
+ECDSA-P256-SHA256 is a second algorithm that has been standardized for use in DNSSEC and is not Quantum Safe.  This algorithm has been also included here just for comparative purposes.
+
+#figure(
+  image("ecdsap256/_charts-all-groups/all-groups-latency-since_0-until_300.png"),
+  caption: [ECDSA-P256-SHA256 All Groups Cold Cache Latency],
+)<ecdsap256-all-groups-latency-since_0-until_300>
+
+#figure(
+  image("ecdsap256/_charts-all-groups/all-groups-latency-since_300-until_600.png"),
+  caption: [ECDSA-P256-SHA256 All Groups Hot Cache Latency],
+)<ecdsap256-all-groups-latency-since_300-until_600>
+
+In @ecdsap256-all-groups-latency-since_0-until_300 and @ecdsap256-all-groups-latency-since_300-until_600
 
 = Discussion (FIXME)
 
@@ -1470,6 +1488,6 @@ Data 20x:
   - MAYO:       https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5577952
   - ANTRAG:     https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5577983
   - FALCON-512: https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5577697
-  - RSA2048:    https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5578007
+  - RSA2048:    https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5602029
   - ECDSAP256:  https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5578064
   - ED25519:    https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5578250
