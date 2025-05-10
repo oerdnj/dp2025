@@ -1,0 +1,7 @@
+[MASTER]
+disable=
+    C0103, # invalid-name
+    C0301, # line-too-long
+    R0801, # duplicate-code
+    R0903, # too-few-public-methods
+    R0917, # too-many-positional-arguments
