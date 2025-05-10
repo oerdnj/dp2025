@@ -912,7 +912,7 @@ Following arguments were used `dnssec-signzone -n 6 -P -x -S -o . -I raw -O raw 
       [ECDSAP256SHA256],	[$218.1$],	  [$10.2$],   [$44286.417$],  [$109.9$],
       [ED25519],					[$240.6$],	  [$6.3$],    [$47288.937$],  [$106.5$],
     ),
-    caption: [DNSSEC Key Generation Times in milliseconds],
+    caption: [DNSSEC Zone Signing Times in milliseconds],
 ) <signing-times>
 
 === Zone Verification Times
@@ -923,7 +923,7 @@ In the @verification-times, the times to verify the current signed Root Zone are
 
 The signed Root Zones from the previous process for each respective algorithms were used.  Again, the zone for verification process was provided in the _raw_ zone format to minimize the effect of the plain text zone file format parsing.
 
-Following arguments were used `~/Projects/bind9/bin/dnssec/dnssec-verify -I raw -o . -x db.root.signed` to verify the signed Root Zone.
+Following arguments were used `dnssec-verify -I raw -o . -x db.root.signed` to verify the signed Root Zone.
 
 #figure(
     table(
@@ -941,7 +941,7 @@ Following arguments were used `~/Projects/bind9/bin/dnssec/dnssec-verify -I raw 
       [ECDSAP256SHA256],	[$610.0$],	  [$2.3$],    [$18.4$],
       [ED25519],					[$819.4$],	  [$2.3$],    [$18.6$],
     ),
-    caption: [DNSSEC Key Generation Times in milliseconds],
+    caption: [DNSSEC Zone Verification Times in milliseconds],
 ) <verification-times>
 
 - Comparison of PQC schemes in terms of key generation, signing, and verification times. 
@@ -1041,90 +1041,552 @@ When evaluating the latency results, it is important to realize that these resul
 In @rsasha256-all-groups-latency-since_0-until_300, the results for a situation when the DNS cache is completely empty (also called Cold Cache) can be observed.  As the cache fills up with the data, the latency gradually improves (smaller is better), and effect of DNS cache (Hot Cache) can be observed in @rsasha256-all-groups-latency-since_300-until_600.  The differences between the normal Root Zone servers and the mock Root Zone server for benchmarking can be observed in this scenario, as the DNSSEC algorithm for both tested branches is the same.
 
 #figure(
-  image("rsasha256/_charts-all-groups/all-groups-latency-since_0-until_300.png"),
-  caption: [RSASHA256/2048 All Groups Cold Cache Latency],
-)<rsasha256-all-groups-latency-since_0-until_300>
+  caption: [RSASHA256/2048 Latencies],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto, auto),
+    [#figure(
+      image("rsasha256/_charts-all-groups/all-groups-latency-since_0-until_300.png"),
+      caption: [Inter-Group Cold Cache],
+      )<rsasha256-all-groups-latency-since_0-until_300>],
+    [#figure(
+      image("rsasha256/_charts-all-groups/all-groups-latency-since_300-until_600.png"),
+      caption: [Inter-Group Hot Cache],
+    )<rsasha256-all-groups-latency-since_300-until_600>],
+
+    [#figure(
+      image("rsasha256/_charts-all/all-latency-since_0-until_300.png"),
+      caption: [Intra-Group Cold Cache],
+    )<rsasha256-all-latency-since_0-until_300>],
+    [#figure(
+      image("rsasha256/_charts-all/all-latency-since_300-until_600.png"),
+      caption: [Intra-Group Hot Cache],
+    )<rsasha256-all-latency-since_300-until_600>],
+  )
+)
+
+The results in @rsasha256-all-groups-latency-since_0-until_300 and @rsasha256-all-groups-latency-since_300-until_600 show only slight variation in the results.  When in doubt, the intra-group results can be evaluated as well as inter-group results.  As can be seen on @rsasha256-all-latency-since_0-until_300 and @rsasha256-all-latency-since_300-until_600, the inter-group difference between 1 and 2 milliseconds can be attributed to the intra-group variance between the individual test results rather than to the inter-group variance.
 
 #figure(
-  image("rsasha256/_charts-all-groups/all-groups-latency-since_300-until_600.png"),
-  caption: [RSASHA256/2048 All Groups Hot Cache Latency],
-)<rsasha256-all-groups-latency-since_300-until_600>
-
-The results in @rsasha256-all-groups-latency-since_0-until_300 and @rsasha256-all-groups-latency-since_300-until_600 show only slight variation in the results.
-
-#figure(
-  image("rsasha256/_charts-all-groups/all-groups-resmon.cpu.usage_percent.cg-docker.png"),
-  caption: [RSASHA256/2048 All Groups CPU Usage Percent],
-)<rsasha256-all-groups-resmon.cpu.usage_percent>
-
-#figure(
-  image("rsasha256/_charts-all-groups/all-groups-resmon.memory.current-docker.png"),
-  caption: [RSASHA256/2048 All Groups Memory Usage],
-)<rsasha256-all-groups-resmon.memory>
+  caption: [RSASHA256/2048 Memory and CPU Usage],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto),
+    [#figure(
+      image("rsasha256/_charts-all-groups/all-groups-resmon.cpu.usage_percent.cg-docker.png"),
+      caption: [Inter-Group CPU Usage],
+    )<rsasha256-all-groups-resmon.cpu.usage_percent>],
+    [#figure(
+      image("rsasha256/_charts-all-groups/all-groups-resmon.memory.current-docker.png"),
+      caption: [Inter-Group Memory Usage],
+    )<rsasha256-all-groups-resmon.memory>]
+  ),
+)
 
 There are also no differences between the tested branches in the CPU usage in @rsasha256-all-groups-resmon.cpu.usage_percent and also no difference in memory usage as observed in @rsasha256-all-groups-resmon.memory.
 
 Overall, it can be concluded that the benchmarking methodology and the setup is not a source of a difference on its own.
 
-==== ECDSA-P256-SHA256
+==== ECDSA-P256-SHA256 Results
 
-ECDSA-P256-SHA256 is a second algorithm that has been standardized for use in DNSSEC and is not Quantum Safe.  This algorithm has been also included here just for comparative purposes.
-
-#figure(
-  image("ecdsap256/_charts-all-groups/all-groups-latency-since_0-until_300.png"),
-  caption: [ECDSA-P256-SHA256 All Groups Cold Cache Latency],
-)<ecdsap256-all-groups-latency-since_0-until_300>
+ECDSA-P256-SHA256 is a second algorithm that has been standardized for use in DNSSEC and is not Quantum Safe.  The ECDSA-P256-SHA256 algorithm is in wide use for the DNSSEC-signed domains with the exception of the top level domain.  As an example, CZ.NIC, the Czech domain registry, uses ECDSA-P256-SHA256 for signing .CZ zone.  However, for the purposes of this work, this algorithm has been also included here just for comparative purposes.
 
 #figure(
-  image("ecdsap256/_charts-all-groups/all-groups-latency-since_300-until_600.png"),
-  caption: [ECDSA-P256-SHA256 All Groups Hot Cache Latency],
-)<ecdsap256-all-groups-latency-since_300-until_600>
+  caption: [ECDSA-P256-SHA256 Latencies],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto, auto),
+    [#figure(
+      image("ecdsap256/_charts-all-groups/all-groups-latency-since_0-until_300.png"),
+      caption: [Inter-Group Cold Cache],
+      )<ecdsap256-all-groups-latency-since_0-until_300>],
+    [#figure(
+      image("ecdsap256/_charts-all-groups/all-groups-latency-since_300-until_600.png"),
+      caption: [Inter-Group Hot Cache],
+    )<ecdsap256-all-groups-latency-since_300-until_600>],
 
-In @ecdsap256-all-groups-latency-since_0-until_300 and @ecdsap256-all-groups-latency-since_300-until_600
+    [#figure(
+      image("ecdsap256/_charts-all/all-latency-since_0-until_300.png"),
+      caption: [Intra-Group Cold Cache],
+    )<ecdsap256-all-latency-since_0-until_300>],
+    [#figure(
+      image("ecdsap256/_charts-all/all-latency-since_300-until_600.png"),
+      caption: [Intra-Group Hot Cache],
+    )<ecdsap256-all-latency-since_300-until_600>],
+  )
+)
 
-= Discussion (FIXME)
+Similarly to RSASHA256 results, there are no differences in @ecdsap256-all-groups-latency-since_0-until_300 and @ecdsap256-all-groups-latency-since_300-until_600 between the base and tested branch that can be attributed to inter-group differences rather than to the intra-group variance.
 
-FIXME: Discuss the shortcomings of the testing methodology.
+#figure(
+  caption: [ECDSA-P256-SHA256 Memory and CPU Usage],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto),
+    [#figure(
+      image("ecdsap256/_charts-all-groups/all-groups-resmon.cpu.usage_percent.cg-docker.png"),
+      caption: [Inter-Group CPU Usage],
+    )<ecdsap256-all-groups-resmon.cpu.usage_percent>],
+    [#figure(
+      image("ecdsap256/_charts-all-groups/all-groups-resmon.memory.current-docker.png"),
+      caption: [Inter-Group Memory Usage],
+    )<ecdsap256-all-groups-resmon.memory>]
+  ),
+)
+
+@ecdsap256-all-groups-resmon.cpu.usage_percent and @ecdsap256-all-groups-resmon.memory show no differences neither in CPU nor memory usage for ECDSA-P256-SHA256.
+
+==== Ed25519 results
+
+The Ed25519 Edwards-curve Digital Signing Algorithm is the last currently standardized algorithm for DNSSEC.  Again, this algorithm is not Quantum Safe and it is included here for comparative purposes.
+
+#figure(
+  caption: [Ed25519 Latencies],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto, auto),
+    [#figure(
+      image("ed25519/_charts-all-groups/all-groups-latency-since_0-until_300.png"),
+      caption: [Inter-Group Cold Cache],
+      )<ed25519-all-groups-latency-since_0-until_300>],
+    [#figure(
+      image("ed25519/_charts-all-groups/all-groups-latency-since_300-until_600.png"),
+      caption: [Inter-Group Hot Cache],
+    )<ed25519-all-groups-latency-since_300-until_600>],
+
+    [#figure(
+      image("ed25519/_charts-all/all-latency-since_0-until_300.png"),
+      caption: [Intra-Group Cold Cache],
+    )<ed25519-all-latency-since_0-until_300>],
+    [#figure(
+      image("ed25519/_charts-all/all-latency-since_300-until_600.png"),
+      caption: [Intra-Group Hot Cache],
+    )<ed25519-all-latency-since_300-until_600>],
+  )
+)
+
+Similarly, the results for Ed25519 doesn't show any inter-domain differences in any of the latencies.
+
+#figure(
+  caption: [Ed25519 Memory and CPU Usage],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto),
+    [#figure(
+      image("ed25519/_charts-all-groups/all-groups-resmon.cpu.usage_percent.cg-docker.png"),
+      caption: [Inter-Group CPU Usage],
+    )<ed25519-all-groups-resmon.cpu.usage_percent>],
+    [#figure(
+      image("ed25519/_charts-all-groups/all-groups-resmon.memory.current-docker.png"),
+      caption: [Inter-Group Memory Usage],
+    )<ed25519-all-groups-resmon.memory>]
+  ),
+)
+
+Nor there are any differences in the memory and the CPU usage.
+
+==== FALCON-512 results
+
+Falcon-512 is the first Quantum-Safe algorithm in the test set that has been already standardized by NIST.  Most of the DNS responses except the delegation queries exceed the configured sizes for the DNS messages and therefore most of the communication between the DNS resolver and mock Root Zone server is two-step - first a DNS query is made over UDP, then the DNS message with Truncated bit is returned and the DNS resolver has to make a second DNS query over TCP.
+
+#figure(
+  caption: [FALCON-512 Latencies],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto, auto),
+    [#figure(
+      image("falcon512/_charts-all-groups/all-groups-latency-since_0-until_300.png"),
+      caption: [Inter-Group Cold Cache],
+      )<falcon512-all-groups-latency-since_0-until_300>],
+    [#figure(
+      image("falcon512/_charts-all-groups/all-groups-latency-since_300-until_600.png"),
+      caption: [Inter-Group Hot Cache],
+    )<falcon512-all-groups-latency-since_300-until_600>],
+
+    [#figure(
+      image("falcon512/_charts-all/all-latency-since_0-until_300.png"),
+      caption: [Intra-Group Cold Cache],
+    )<falcon512-all-latency-since_0-until_300>],
+    [#figure(
+      image("falcon512/_charts-all/all-latency-since_300-until_600.png"),
+      caption: [Intra-Group Hot Cache],
+    )<falcon512-all-latency-since_300-until_600>],
+  )
+)
+
+In the Cold Cache scenario (@falcon512-all-groups-latency-since_0-until_300), a significant inter-group difference can been seen.  The percentage of DNS responses returned under 1 millisecond drops from $10% - 20%$ range to $20% - 30%$ range.  The percentage of queries returned under 2 seconds drops by $0.5%$ – that accounts roughly for $1000$ DNS queries per second that timeout and has to be retried by the DNS clients.
+
+The differences in the Hot Cache scenario (@falcon512-all-groups-latency-since_300-until_600) also show significant drop in the response latencies.  The percentage of DNS responses received under 1 millisecond drops from $5% - 6%$ range to $10% - 20%$ range.  However, the difference is smoothed out and the overall percentage of DNS queries not responded under 2 seconds shows no difference.
+
+#figure(
+  caption: [Falcon-512 Memory and CPU Usage],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto),
+    [#figure(
+      image("falcon512/_charts-all-groups/all-groups-resmon.cpu.usage_percent.cg-docker.png"),
+      caption: [Inter-Group CPU Usage],
+    )<falcon512-all-groups-resmon.cpu.usage_percent>],
+    [#figure(
+      image("falcon512/_charts-all-groups/all-groups-resmon.memory.current-docker.png"),
+      caption: [Inter-Group Memory Usage],
+    )<falcon512-all-groups-resmon.memory>]
+  ),
+)
+
+The CPU usage (@falcon512-all-groups-resmon.cpu.usage_percent) between the two tested group also shows an increase that can be attributed to the computational demands of the FALCON-512 algorithm.  And while there is still some idle time left on the CPUs as the full usage of 16 cores would be shown as $1600$, it is important to realize that not all CPU time can be fully utilized and any extra computational time needed for DNSSEC algorithms will slow down all the DNS resolver operations.
+
+The FALCON-512 memory usage (@falcon512-all-groups-resmon.memory) shows some fluctuation around 210, 295 and 535 seconds marks, but there's not enough supporting evidence to make any conclusion about the exact causes for these short memory bumps.  The smoothed memory usage for FALCON-512 is similar to the baseline memory usage.
+
+==== HAWK-256 results
+
+The Hawk-256 algorithm is a Quantum-Safe algorithm that has the most favorable properties for the use in DNSSEC.  All the evaluated DNS messages generated by the authoritative DNS server are smaller than than the configure EDNS(0) DNS message size ($1452$), and the algorithm speed even outperforms not only all the other chosen Quantum-Safe algorithms, but also outperforms all the classic cryptography algorithms used in DNSSEC.
+
+#figure(
+  caption: [Hawk-256 Latencies],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto, auto),
+    [#figure(
+      image("hawk256/_charts-all-groups/all-groups-latency-since_0-until_300.png"),
+      caption: [Inter-Group Cold Cache],
+      )<hawk256-all-groups-latency-since_0-until_300>],
+    [#figure(
+      image("hawk256/_charts-all-groups/all-groups-latency-since_300-until_600.png"),
+      caption: [Inter-Group Hot Cache],
+    )<hawk256-all-groups-latency-since_300-until_600>],
+
+    [#figure(
+      image("hawk256/_charts-all/all-latency-since_0-until_300.png"),
+      caption: [Intra-Group Cold Cache],
+    )<hawk256-all-latency-since_0-until_300>],
+    [#figure(
+      image("hawk256/_charts-all/all-latency-since_300-until_600.png"),
+      caption: [Intra-Group Hot Cache],
+    )<hawk256-all-latency-since_300-until_600>],
+  )
+)
+
+And Hawk-256 didn't fail the expectations.  The performance in the Cold Cache (@hawk256-all-groups-latency-since_0-until_300) and Hot Cache (@hawk256-all-groups-latency-since_300-until_600) scenarios is similar to the baseline and the differences can be attributed to the intra-group variations between the runs.
+
+#figure(
+  caption: [Hawk-256 Memory and CPU Usage],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto),
+    [#figure(
+      image("hawk256/_charts-all-groups/all-groups-resmon.cpu.usage_percent.cg-docker.png"),
+      caption: [Inter-Group CPU Usage],
+    )<hawk256-all-groups-resmon.cpu.usage_percent>],
+    [#figure(
+      image("hawk256/_charts-all-groups/all-groups-resmon.memory.current-docker.png"),
+      caption: [Inter-Group Memory Usage],
+    )<hawk256-all-groups-resmon.memory>]
+  ),
+)
+
+There's also no difference in the CPU usage (@hawk256-all-groups-resmon.cpu.usage_percent) and there seems to be slight decrease in the memory usage (@hawk256-all-groups-resmon.memory), but there's not enough supporting evidence to say whether the difference is really significant.  Practically speaking, even though there might be a slight decrease in the memory use, such small change is not going to make any practical difference for the DNS operations.
+
+==== Hawk-512 Results
+
+The Hawk-512 algorithm is a second tested algorithm from the Hawk family.  Hawk-512 is being submitted as the NIST Level I algorithm (as opposed to Hawk-256 that was submitted in the "Break me if you can" category), but that comes at the cost of increased signature sizes.  The Hawk-512 algorithm still outperforms RSA256/2048 in the signing speed and also outperforms EC-based algorithms (ECDSA-P256-SHA256 and Ed25519) in the verification speed.
+
+#figure(
+  caption: [Hawk-512 Latencies],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto, auto),
+    [#figure(
+      image("hawk512/_charts-all-groups/all-groups-latency-since_0-until_300.png"),
+      caption: [Inter-Group Cold Cache],
+      )<hawk512-all-groups-latency-since_0-until_300>],
+    [#figure(
+      image("hawk512/_charts-all-groups/all-groups-latency-since_300-until_600.png"),
+      caption: [Inter-Group Hot Cache],
+    )<hawk512-all-groups-latency-since_300-until_600>],
+
+    [#figure(
+      image("hawk512/_charts-all/all-latency-since_0-until_300.png"),
+      caption: [Intra-Group Cold Cache],
+    )<hawk512-all-latency-since_0-until_300>],
+    [#figure(
+      image("hawk512/_charts-all/all-latency-since_300-until_600.png"),
+      caption: [Intra-Group Hot Cache],
+    )<hawk512-all-latency-since_300-until_600>],
+  )
+)
+
+The Hawk-512 branch shows a small difference both in the Cold Cache (@hawk512-all-groups-latency-since_0-until_300) and Hot Cache (@hawk512-all-groups-latency-since_300-until_600) scenarios, but again the differences can be attributed to intra-group variations (@hawk512-all-latency-since_0-until_300 and @hawk512-all-latency-since_300-until_600).
+
+#figure(
+  caption: [Hawk-512 Memory and CPU Usage],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto),
+    [#figure(
+      image("hawk512/_charts-all-groups/all-groups-resmon.cpu.usage_percent.cg-docker.png"),
+      caption: [Inter-Group CPU Usage],
+    )<hawk512-all-groups-resmon.cpu.usage_percent>],
+    [#figure(
+      image("hawk512/_charts-all-groups/all-groups-resmon.memory.current-docker.png"),
+      caption: [Inter-Group Memory Usage],
+    )<hawk512-all-groups-resmon.memory>]
+  ),
+)
+
+As for the CPU and memory usage, there are no observable differences in the @hawk512-all-groups-resmon.cpu.usage_percent and @hawk512-all-groups-resmon.memory.
+
+==== SQISign-I results
+
+The SQISign algorithm with NIST Level I parameters has been tested.  The SQISign-I public key has very favorable size - the algorithm outperforms RSA256/2048 and has DNS messages sizes in the similar ballpark as EC-based algorithms.  It is also one of the two tested Quantum-Safe algorithms that is not based on the lattices.  Unfortunately, the signing and verification speeds are one magnitude slower than Falcon-512 and two magnitudes slower than EC-based algorithms and the algorithms in the Hawk family.
+
+#figure(
+  caption: [SQIsign-I Latencies],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto, auto),
+    [#figure(
+      image("sqisign/_charts-all-groups/all-groups-latency-since_0-until_300.png"),
+      caption: [Inter-Group Cold Cache],
+      )<sqisign-all-groups-latency-since_0-until_300>],
+    [#figure(
+      image("sqisign/_charts-all-groups/all-groups-latency-since_300-until_600.png"),
+      caption: [Inter-Group Hot Cache],
+    )<sqisign-all-groups-latency-since_300-until_600>],
+
+    [#figure(
+      image("sqisign/_charts-all/all-latency-since_0-until_300.png"),
+      caption: [Intra-Group Cold Cache],
+    )<sqisign-all-latency-since_0-until_300>],
+    [#figure(
+      image("sqisign/_charts-all/all-latency-since_300-until_600.png"),
+      caption: [Intra-Group Hot Cache],
+    )<sqisign-all-latency-since_300-until_600>],
+  )
+)
+
+As expected, there are difference between the baseline and SQISign-I latencies.  In the Cold Cache (@sqisign-all-groups-latency-since_0-until_300) scenario, the percentage of the DNS queries with matching DNS answer under $1$ millisecond drop from the $10% - 20%$ range to sharp $20%$ range, and the percentage of the DNS queries that received answer under 2 seconds drops from the $1% - 2%$ range to close to $3%$ range.  That's close to $2000$ DNS queries that the DNS resolver was not able to successfully provide an answer in time for DNS client to not time-out and retry.
+
+The Hot Cache (@sqisign-all-groups-latency-since_300-until_600) scenario also shows a significant drop in the percentage of the answered DNS queries.  There is $0.5%$ drop in the number of the DNS queries answered under $1$ millisecond, and there's $0.2%$ difference between the baseline and SQISign-I latencies for answered DNS queries under 2 seconds.
+
+#figure(
+  caption: [SQIsign-I Memory and CPU Usage],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto),
+    [#figure(
+      image("sqisign/_charts-all-groups/all-groups-resmon.cpu.usage_percent.cg-docker.png"),
+      caption: [Inter-Group CPU Usage],
+    )<sqisign-all-groups-resmon.cpu.usage_percent>],
+    [#figure(
+      image("sqisign/_charts-all-groups/all-groups-resmon.memory.current-docker.png"),
+      caption: [Inter-Group Memory Usage],
+    )<sqisign-all-groups-resmon.memory>]
+  ),
+)
+
+In @sqisign-all-groups-resmon.cpu.usage_percent, it can been seen that the CPU usage is higher in the beginning, but it quickly stabilizes as the cache becomes hot and then there's only occasional difference in a form of sharper spikes.
+
+The memory usage (@sqisign-all-groups-resmon.memory) doesn't show any noticeable difference between the two tested branches.
+
+==== MAYO-I results
+
+The MAYO algorithm with NIST Level I parameters has been also tested.  This is a second Quantum-Safe algorithm that is not lattice-based.  The MAYO-I public key is quite large, thus the DNSKEY DNS messages are largest from the whole set of tested algorithms.  The signatures are still large, but only the DNS messages with NSEC-proofs exceed the configure EDNS(0) buffer size.  The signing speed is similar to the one of the RSA256/2048 and the verification speed is in the same ballpark as Ed25519.
+
+#figure(
+  caption: [MAYO-I Latencies],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto, auto),
+    [#figure(
+      image("mayo/_charts-all-groups/all-groups-latency-since_0-until_300.png"),
+      caption: [Inter-Group Cold Cache],
+      )<mayo-all-groups-latency-since_0-until_300>],
+    [#figure(
+      image("mayo/_charts-all-groups/all-groups-latency-since_300-until_600.png"),
+      caption: [Inter-Group Hot Cache],
+    )<mayo-all-groups-latency-since_300-until_600>],
+
+    [#figure(
+      image("mayo/_charts-all/all-latency-since_0-until_300.png"),
+      caption: [Intra-Group Cold Cache],
+    )<mayo-all-latency-since_0-until_300>],
+    [#figure(
+      image("mayo/_charts-all/all-latency-since_300-until_600.png"),
+      caption: [Intra-Group Hot Cache],
+    )<mayo-all-latency-since_300-until_600>],
+  )
+)
+
+The the Cold Cache (@mayo-all-groups-latency-since_0-until_300) and Hot Cache (@mayo-all-groups-latency-since_300-until_600) results for MAYO-I shows no differences that cannot be attributed to the intra-group variations between the individual runs.
+
+#figure(
+  caption: [MAYO-I Memory and CPU Usage],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto),
+    [#figure(
+      image("mayo/_charts-all-groups/all-groups-resmon.cpu.usage_percent.cg-docker.png"),
+      caption: [Inter-Group CPU Usage],
+    )<mayo-all-groups-resmon.cpu.usage_percent>],
+    [#figure(
+      image("mayo/_charts-all-groups/all-groups-resmon.memory.current-docker.png"),
+      caption: [Inter-Group Memory Usage],
+    )<mayo-all-groups-resmon.memory>]
+  ),
+)
+
+There are also no difference for MAYO-I CPU and memory usage.
+
+==== Antrag-512 results
+
+The Antrag-512 algorithm is based on Falcon-512 and the algorithm's authors focused on making the signatures smaller than those Falcon-512's.  The signing and verification speeds are similar to Falcon-512 making the Antrag-512 suitable for DNSSEC use.  The public key size is larger that MAYO public key size.  Similarly to MAYO, only DNS messages for DNSKEY RR type and non-existence proofs (NSECs) are truncated over UDP and has to be retried by using DNS over TCP.
+
+#figure(
+  caption: [Antrag-512 Latencies],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto, auto),
+    [#figure(
+      image("antrag/_charts-all-groups/all-groups-latency-since_0-until_300.png"),
+      caption: [Inter-Group Cold Cache],
+      )<antrag-all-groups-latency-since_0-until_300>],
+    [#figure(
+      image("antrag/_charts-all-groups/all-groups-latency-since_300-until_600.png"),
+      caption: [Inter-Group Hot Cache],
+    )<antrag-all-groups-latency-since_300-until_600>],
+
+    [#figure(
+      image("antrag/_charts-all/all-latency-since_0-until_300.png"),
+      caption: [Intra-Group Cold Cache],
+    )<antrag-all-latency-since_0-until_300>],
+    [#figure(
+      image("antrag/_charts-all/all-latency-since_300-until_600.png"),
+      caption: [Intra-Group Hot Cache],
+    )<antrag-all-latency-since_300-until_600>],
+  )
+)
+
+In @antrag-all-groups-latency-since_0-until_300 and @antrag-all-groups-latency-since_300-until_600, there are no differences between baseline and Antrag-512 latencies that can't be attributed to inter-group and inter-run differences.
+
+#figure(
+  caption: [Antrag-512 Memory and CPU Usage],
+  numbering: none,
+  grid(
+    columns: (auto, auto),
+    rows: (auto),
+    [#figure(
+      image("antrag/_charts-all-groups/all-groups-resmon.cpu.usage_percent.cg-docker.png"),
+      caption: [Inter-Group CPU Usage],
+    )<antrag-all-groups-resmon.cpu.usage_percent>],
+    [#figure(
+      image("antrag/_charts-all-groups/all-groups-resmon.memory.current-docker.png"),
+      caption: [Inter-Group Memory Usage],
+    )<antrag-all-groups-resmon.memory>]
+  ),
+)
+
+Antrag-512 also doesn't cause any visible differences in the CPU usage (@antrag-all-groups-resmon.cpu.usage_percent) and memory usage (@antrag-all-groups-resmon.memory).
+
+= Discussion
 
 == Interpretation of Results
-- Implications of the findings for DNSSEC and internet security. 
+
+The offline and online results shows several area that are important for the deployment of the new Digital Signature Schema algorithms for DNSSEC.
+
+The first area is the public key size.  There were three algorithms that cause the DNS answer with DNSSEC-signed DNSKEY RR types to exceed the configured EDNS(0) buffer size has been tested - Falcon-512, MAYO-I and Antrag-512.  There's a significant difference between the Falcon-512 and the other two algorithms - MAYO-I and Antrag-512 that can be contributed to the large Falcon-512 signature size.  The MAYO-I and Antrag-512 results suggest that the algorithm's public key size that is reflected in the DNSKEY Resource Records sizes doesn't make any noticeable difference for the DNS resolver performance in the tested environment.
+
+The second focus area is the signature sizes.  There was a single algorithm - Falcon-512 - that caused the DNS messages (except for the delegation answers) to go over configured EDNS(0) buffer size.  The performance results suggest that the signature sizes are one of the key factors that cause the drop in the DNS resolver performance and increased latencies in the DNS communication.
+
+The third studied area was the verification speed.  Most of the tested Quantum-Safe algorithms are in the similar magnitude as the existing DNSSEC algorithms with the most notable exception of SQIsign family of algorithms and the tested SQIsign with NIST Level I parameters.  The results show a measurable drop in the performance.  However, when evaluating the results, two things must be considered - a) the charts showing the differences are logarithmical and thus any difference is visually exaggerated, b) a reasonable drop in performance can be a solid compromised for an increased security in the DNS ecosystem.
+
+The last area that's less significant for a DNS resolver operation, but can't be left out, is a signing speed.  While the overhead in this area is negligible for most of the zones on the Internet, there are at least two notable use cases where the signing speed matter.  One use case is the large TLD zones like .com or .de; the number of the records in the zone itself isn't the problem, but with the increased number of the records in the zone file also comes the increased number of the changes that has to be signed.  The signing speed is also a factor in case of event where the signing keys for the zone has to be changed because of an external event like a secret key compromise.  The second use case is the case of a DNS operator that maintains a very large number of the zones.  A two-magnitude decrease in the signing speed would require all of the affected parties to increase the operational costs for DNSSEC signing.
 
 == Challenges and Limitations
-- Technical and operational challenges in adopting PQC for DNSSEC. 
-- Limitations of the study and areas for further research. 
 
-== Recommendations
-- Strategies for transitioning DNSSEC to PQC. 
-- Policy and standardization considerations. 
+This study has been limited to only a handful Quantum-Safe algorithms, and only Falcon-512 has been standardized by NIST so far.  Additionally, even the Falcon family of the algorithms hasn't been fully scrutinized by the cryptographic community and there are recent cryptanalysis papers (@cryptoeprint:2023-224, @springer-10-1007-978-3-031-91820-9_8) that study the side-channels attacks on Falcon-512.  The world of Quantum-Safe algorithms is quickly evolving and the standardization of any new algorithm for DNSSEC must not be rushed.  This is applicable to Falcon-512 but also to the all the other tested algorithms that had only be accepted to the Round 2 of the NIST Additional Digital Signature Schema competition.  In the case of Antrag-512, the algorithm hasn't even been in this challenge and has been presented only handful of times during cryptology conferences.
 
----
+Furthermore, this study focused only on the normal (real-world) DNS traffic patterns.  However, the attackers are not limited by the normal DNS traffic pattern.  One of the serious challenges even for the normal DNS operations is the pseudo-random sub-domain (PRSD) attack on the DNS resolver.  The attacker creates pseudo-random DNS labels that are used as prefixes for the domain under the attack and the DNS resolver is forced to make outgoing queries for each PRSD query that the attacker makes.  There are mitigation techniques for the PRSD attack for DNSSEC-signed domains - more on that in the @recommendations.  The future study should focus on the malicious traffic patterns and study the effects on the DNS Resolver performance where the ratio between the existing domain name and non-existing domain names would vary.
 
-= Conclusion
-== Summary of Findings
-- Recap of key results and their significance. 
+In this test,only the Root Zone was signed with the tested Quantum-Safe algorithm.  As the Root Zone size is fairly limited and it only uses the NSEC (not NSEC3) algorithm for the non-existence proofs, the results of the measurements are also limited.  The Root Zone also uses large TTLs and thus the contents of the Root Zone are very quickly inserted into the DNS cache including the DNSSEC-validation results.  The future study should use the studied algorithms on more levels of the DNS hierarchy - notably at the Top-Level Domain level, especially for the huge zones like .com, .de, or .cn, and the large DNSSEC-signed zones like .cz or .se.
 
-== Contributions to the Field
-- How the research advances the understanding of PQC in DNSSEC. 
+== Recommendations<recommendations>
+
+1. Use TCP first: For the algorithms that regularly exceed the UDP limit for the DNS messages with signed DNS Resource Record types, it might be feasible to directly switch the used protocol from UDP to TCP.  This will reduce the round trip time, but it will increase the computing and networking resources used both the DNS client and the DNS server.  The shift from the insecure protocols like UDP to TCP to transports with inherent security like DNS over TCP (DoT) or DNS over HTTP/2 (DoH) has already begun, and the need for DNS transports that can transport large DNS messages without truncation and more round-trips might be the last straw that will make the DNS world to switch from UDP to TCP-based protocols.
+
+2. Aggressive Use of DNSSEC-Validated Cache: One of the mitigations for the pseudo-random sub-domain attacks is the Aggressive Use of DNSSEC-Validated Cache @rfc8198 that uses the already cached proofs of non-existence to answer matching PRSD queries.  As some of the algorithms are more computational-heavy or require more large DNS messages, the Aggressive Use of DNSSEC-Validated Cache is a basic requirement to reduce the impact of the increased resource usage.  Most of the existing DNS implementation already implement the algorithm for the NSEC records, and DNS Resolver implementations should extend this to also use NSEC3 records in the DNSSEC-Validated Cache.
+
+3. Disable use NSEC3 opt-out: The DNS Security (DNSSEC) Hashed Authenticated Denial of Existence @rfc5155 provide an option to generated the NSEC3 records only for secure delegation records (DS).  For zones with sparse population of signed child domains, it significantly reduced the number of DNSSEC signatures needed when signing the full zone.  Unfortunately, NSEC3 opt-opt is incompatible with the Aggressive Use of DNSSEC-Validated Cache.  Thus, it is recommended to disable the NSEC3 opt-opt mechanism for the new Quantum-Safe algorithms.
+
+4. Use different algorithms: As the different parts of the DNS tree might have different requirements, it might be also possible to use different algorithms for different parts of the DNS tree.  Most notably, the Root Zone have special properties - it is well maintained, have long TTLs and its contents are limited only to the TLDs.
+
+5. Ask NIST for guidance: The current PQC challenges run by NIST mostly focuses on the algorithms that have properties needed for long-term archival and protection.  The DNSSEC needs are little bit different - there signatures are changed often, there's a possibility of automated key exchange.  It is recommended that the DNS community speaks with the cryptographers community and highlights the DNSSEC needs and ask the cryptographic community for a guidance.
 
 == Future Work
-- Potential directions for further research (e.g., hybrid schemes, optimization techniques). 
 
+As already outlined in this section, there are several areas for the future work.
 
--- Personal conversation with Eyal Ronen, 24.7.2024 --
-Hi Ondrej,
+=== Non-existence proofs
 
-Nice to e-meet you.
+As the pseudo-random sub-domain attack mainly uses the domain names that don't exist, the impact of the Quantum-Safe algorithm signatures on the non-existence proofs (both NSEC and NSEC3) needs to be further explored.  The Shotgun CI system already has support for using different test-sets and this feature can be used to either provide a single pre-generated set of pseudo-random sub-domains targeted at specific level of the DNS hierarchy, or a online generator can be created that feeds the Shotgun client system with pseudo-randomly generated domain names according to the input parameters.
 
-I think that there are several other options for PQ signatures for DNSSEC, that can rely on the specific use case.
-For example, assuming we have a known number of signatures for a specific zone, and we allow for the signer to be state-full, we can use XMSS (or even just one tree) directly as the signature. This will have a relatively small signature size and fast verification.
-If being stateless is very important, we can consider SPHINCS+ variants that can support a maximum of 2^16 signatures instead of 2^64, which will also result in a much smaller signature.
+=== Different levels of DNS hierarchy
 
-Best regards,
-Eyal Ronen
--- Personal conversation with Eyal Ronen, 24.7.2024 --
+This study only focused on the Root Zone level of the DNS hierarchy.  ICANN's Centralized Zone Data Service (CZDS) is an online portal where any interested party can request access to the Zone Files provided by participating generic Top-Level Domains (gTLDs) @czds.  This service can be used to download many TLD zone files that can be re-signed with Quantum-Safe algorithms and more thorough mock setup of the DNS hierarchy can be created.  Notably large zones like .com, .net, or .org can be downloaded from the service.  Additionally, there are some ccTLDs (country-code TLDs) that provide access to their zone files like IIS @iis-zonedata for .se and .nu.  Using a mixed setup will also allow testing the environment that would mimic the gradual deployment of the Quantum-Safe algorithms at various points of the DNS hierarchy.
+
+=== Test more algorithms
+
+Since the public key sizes didn't affect the DNS Resolver performance in this particular test, more Quantum-Safe algorithms might be an viable option for DNSSEC.  As NIST progresses with the Round 2, the choice of the algorithms for testing could be revisiting once the Additional Digital Signature Schema challenge moves to Round 3.
+
+=== Think like an attacker
+
+This study focused on the real-world, relatively normal, DNS traffic.  The future study can focus on scenarios where the attacker abuse the DNS for attacking other services (reflection Distributed Denial of Service attack) or use the algorithm properties to attack the DNS itself.  Even though the public key sizes were not a factor in this study, it should be studied how the public key and signature sizes affect the DNS Resolver performance in the case of malign authoritative name-server.  Scenarios might include very short or zero TTL values, short signature times and constantly changing Signing Keys (Zone Signing Keys) that force the DNS Resolver to repeatedly to re-query the contents of the zone under attacker's control.
+
+= Conclusion
+
+== Summary of Findings
+
+This study evaluated the feasibility of integrating the new Post-Quantum Cryptography algorithms into the DNS Security Extensions (DNSSEC) framework.  The research focused on several key aspects: public key sizes, signature sizes, signing speed, and verification speed.  The findings indicated that while some PQC algorithms show promise, there are still significant challenges and considerations to be solved before this can happen.
+
+=== Public Key Size
+
+The Public Key size is a critical factor for DNSSEC operations.  This study has shown that under the normal circumstances there is no difference between the algorithms that fit the DNS queries for DNSKEY records into the UDP messages and those that have to fall-back to TCP to get the full contents of the DNSKEY Resource Records with the respective signatures.  Further research is needed in this area to verify the findings in the case of an attack on the DNS infrastructure or misconfiguration.
+
+=== Signature Size
+
+Another crucial factor for DNSSEC is a signature size.  Larger signatures can lead to increased DNS message sizes, which may exceed the EDNS(0) buffer size for DNS message payload limits, again requiring a fallback to TCP. This not only affects the performance but also increases the networking bandwidth usage. The study observed that algorithms like Falcon-512 that consistently generate larger signatures tend to have an impact on DNS latencies compared to those with smaller signatures.
+
+=== Signing and Verification Speeds
+
+The speed of signing and verification processes is essential for the efficient operation of DNS and DNSSEC. The study found that while some PQC algorithms, such as Hawk-256 and Hawk-512, offer signing and verification speeds comparable to or better than traditional algorithms like RSA and ECDSA, others like SQISign-I exhibit significantly slower performance. This can be a limiting factor for DNS resolver operators, but also for authoritative DNS server operators and signer, especially for large zones or DNS operators with large number of signed zones.
+
+=== Performance Impact
+
+The performance impact of integrating PQC algorithms into DNSSEC was evaluated through extensive benchmarking. The study results showed that while some algorithms like Hawk-256 and Hawk-512 have minimal impact on the DNS Resolver performance, others like Falcon-512 and SQISign-I introduce noticeable latency and computational overhead. This highlights the need for careful selection and optimization of Quantum-Safe algorithms for DNSSEC. 
+
+== Contributions to the Field
+
+The research provides new insights about the practicality and obstacles of implementing post-quantum cryptographic algorithms in the DNS and DNSSEC. The research evaluates multiple contemporary Quantum-Safe algorithms to determine their feasibility and effectiveness for DNSSEC. The findings contribute to the ongoing efforts to secure DNS infrastructure against the threats posed by quantum computing.
 
 #pagebreak()
-// #bibliography(title: "Literature", "items.bib", style: "iso-690-numeric")
+
 #bibliography(title: "Literature", "items.bib", style: "ieee")
 
 #set heading(numbering: none)

@@ -703,3 +703,75 @@ keywords = {DNS, post-quantum cryptography, security}
   year = {2017},
   url = {https://blog.powerdns.com/2017/11/02/dns-performance-metrics-the-logarithmic-percentile-histogram}
 }
+
+@misc{cryptoeprint:2023-224,
+      author = {Shiduo Zhang and Xiuhan Lin and Yang Yu and Weijia Wang},
+      title = {Improved Power Analysis Attacks on Falcon},
+      howpublished = {Cryptology {ePrint} Archive, Paper 2023/224},
+      year = {2023},
+      url = {https://eprint.iacr.org/2023/224}
+}
+
+@InProceedings{springer-10-1007-978-3-031-91820-9_8,
+author="Lin, Xiuhan
+and Zhang, Shiduo
+and Yu, Yang
+and Wang, Weijia
+and You, Qidi
+and Xu, Ximing
+and Wang, Xiaoyun",
+editor="Jager, Tibor
+and Pan, Jiaxin",
+title="Thorough Power Analysis on Falcon Gaussian Samplers and Practical Countermeasure",
+booktitle="Public-Key Cryptography -- PKC 2025",
+year="2025",
+publisher="Springer Nature Switzerland",
+address="Cham",
+pages="229--258",
+abstract="Falcon is one of post-quantum signature schemes selected by NIST for standardization. With the deployment underway, its implementation security is of great importance. In this work, we focus on the side-channel security of Falcon and our contributions are threefold.",
+isbn="978-3-031-91820-9"
+}
+
+@misc{rfc8198,
+    series =    {Request for Comments},
+    number =    8198,
+    howpublished =  {RFC 8198},
+    publisher = {RFC Editor},
+    doi =       {10.17487/RFC8198},
+    url =       {https://www.rfc-editor.org/info/rfc8198},
+    author =    {Kazunori Fujiwara and Akira Kato and Warren Kumari},
+    title =     {{Aggressive Use of DNSSEC-Validated Cache}},
+    pagetotal = 13,
+    year =      2017,
+    month =     jul,
+    abstract =  {The DNS relies upon caching to scale; however, the cache lookup generally requires an exact match. This document specifies the use of NSEC/NSEC3 resource records to allow DNSSEC-validating resolvers to generate negative answers within a range and positive answers from wildcards. This increases performance, decreases latency, decreases resource utilization on both authoritative and recursive servers, and increases privacy. Also, it may help increase resilience to certain DoS attacks in some circumstances. This document updates RFC 4035 by allowing validating resolvers to generate negative answers based upon NSEC/NSEC3 records and positive answers in the presence of wildcards.},
+}
+
+@misc{rfc5155,
+    series =    {Request for Comments},
+    number =    5155,
+    howpublished =  {RFC 5155},
+    publisher = {RFC Editor},
+    doi =       {10.17487/RFC5155},
+    url =       {https://www.rfc-editor.org/info/rfc5155},
+    author =    {Roy Arends and Geoffrey Sisson and David Blacka and Ben Laurie},
+    title =     {{DNS Security (DNSSEC) Hashed Authenticated Denial of Existence}},
+    pagetotal = 52,
+    year =      2008,
+    month =     mar,
+    abstract =  {The Domain Name System Security (DNSSEC) Extensions introduced the NSEC resource record (RR) for authenticated denial of existence. This document introduces an alternative resource record, NSEC3, which similarly provides authenticated denial of existence. However, it also provides measures against zone enumeration and permits gradual expansion of delegation-centric zones. {[}STANDARDS-TRACK{]}},
+}
+
+@misc{czds,
+  title = {Centralized Zone Data Service},
+  author = {ICANN},
+  year = {2025},
+  url = {https://czds.icann.org/help}
+}
+
+@misc{iis-zonedata,
+  title = {IIS Zone Data},
+  author = {Internetstiftelsen},
+  year = {2025},
+  url = {https://internetstiftelsen.se/en/zone-data/}
+}
