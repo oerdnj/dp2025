@@ -71,19 +71,16 @@
 
 #text(16pt, upper[Abstract])
 
-The Domain Name System (DNS) is a critical part of the internet that maps domain names to their corresponding IP addresses. DNS Security Extensions (DNSSEC) were developed to secure DNS, preventing attacks like cache poisoning and man-in-the-middle attacks by authenticating DNS data with cryptographic signatures. However, the rise of quantum computing presents major risks to current cryptographic systems because many public-key crypto-systems can be broken by quantum algorithms.
- 
-As a result, the National Institute of Standards and Technology (NIST) is currently working on standardizing more post-quantum cryptographic algorithms because current post-quantum signature schemes standardized by NIST have large public keys and/or signatures that can make DNSSEC operations more complicated and burdensome.
- 
-Beernink @beernink suggested the solution of putting the public keys on web-servers that would decrease the size of DNSSEC records but would add complexity, for instance, dependence on the HTTP protocol and the need for the DNS resolver operators to have web-servers. 
- 
-In this work, we investigate the appropriateness of the new post-quantum cryptography schemes for the DNSSEC.
+The Domain Name System (DNS) is a fundamental component of the Internet, translating domain names into IP addresses and other records. DNS Security Extensions (DNSSEC) were introduced to secure DNS by authenticating DNS data with cryptographic signatures, thereby preventing attacks such as cache poisoning and man-in-the-middle attacks. However, the advent of quantum computing poses significant risks to current cryptographic systems, as many public-key cryptosystems can be compromised by the quantum algorithms.
+
+In response, the National Institute of Standards and Technology (NIST) is standardizing post-quantum cryptographic algorithms. Current post-quantum signature schemes standardized by NIST, however, have large public keys and/or signatures, complicating DNSSEC operations.
+
+This work investigates the suitability of new post-quantum cryptography schemes for DNSSEC. We evaluate the impact of these schemes on DNSSEC operations, focusing on their integration into the BIND 9 open-source DNS server. Real-world testing is employed to assess the compatibility and performance of the selected algorithms, providing insights into their feasibility for securing DNS infrastructure against quantum computing threats.
 
 #v(2em)
 
-
 Keywords: \
-DNS, DNSSEC, Post-Quantum, Cryptography
+DNS, DNSSEC, Post-Quantum, Quantum-Safe, Cryptography
 
 #pagebreak()
 
@@ -101,7 +98,17 @@ DNS, DNSSEC, Post-Quantum, Cryptography
 
 #pagebreak()
 
-FIXME: Thanks 
+I extend my sincerest appreciation to all individuals who supported me during the completion of my master's thesis.
+
+My deepest appreciation goes to my wife because she provided me with continuous support and patience together with encouragement.  My thanks also goes to my kids who grew up to the age that they are self-sufficient human being that don't require a constant attention and that allowed me to spend some time studying and writing this works.
+
+I want to express my appreciation to my academic advisors and professors who provided me with their professional guidance and useful feedback. Your guidance together with your mentorship provided essential value to my research development while helping me become a better scholar.
+
+I want to express my gratitude to my colleagues and peers for their teamwork and their friendship and their helpful support. Your involvement and friendship made this experience more satisfying and rewarding.
+
+I express my gratitude to everyone who joined me on this remarkable adventure. I feel extremely fortunate to have such an amazing support network.
+
+#pagebreak()
 
 I hereby state that this submitted thesis is my original author work and that I elaborated it myself. I properly cite all references and other sources that I used to work up the thesis. Those references and other sources are given in the list of references.
 
@@ -142,11 +149,11 @@ Bc. Ondřej Surý
 
 == Domain Name System
 
-The Domain Name System (DNS) is one of the most important parts of the modern Internet, which is the key to changing domain names to IP addresses that devices understand. This is a de-centralized, hierarchical and very much like an encyclopedia, a distributed database system that was created in 1983 to overcome the scalability issues of the original HOSTS.TXT file system and has become a very important part of the architecture of the internet to map domain names to different types of resources.
+The Domain Name System (DNS) is one of the most important parts of the modern Internet, which is the key to translating domain names to IP addresses that computers understand. This is a de-centralized, hierarchical, and a distributed database system that was created in 1983 to overcome the scalability issues of the original HOSTS.TXT file system.  DNS has become a very important part of the architecture of the Internet to map domain names to different types of resources.
 
-In simplest terms, DNS is a translator; it converts domain names, such as _example.com_ into numbers like `192.0.2.1` that computers can recognize and use to identify and communicate with other devices on the Internet. This is what is known as an abstraction, where the user can use easily memorable domain names and the internal system takes care of the network addressing.esides the straight forward name-to-IP address lookup, DNS supports numerous other resource records including MX records for mailing purposes, TXT records for domain verification and SRV records for service location.
+In simplest terms, DNS is a translator; it converts domain names, such as _example.com_ into numbers like `192.0.2.1` that computers can recognize and use to identify and communicate with other devices on the Internet. This is an abstraction, where the user can use easily memorable domain names and the internal system takes care of the network addressing. Besides the straight forward name-to-IP address lookup, DNS supports numerous other resource records including MX records for mailing purposes, TXT records for domain verification and SRV records for service location.
 
-The Domain Name System is a hierarchical structure with the root domain (_._) at the top, then the Top Level Domains (TLDs), the generic TLDs (gTLDs) such as _.com_, _.org_, the country code TLDs (ccTLDs) such as _.uk_ or _.cz_, sponsored TLDs (sTLDs) for particular purposes like _.cat_ (not the animals, but the top-level domain for the Catalan linguistic and cultural community), _.edu_ (for Institutions of higher learning in the US) or .aero (for members of the air transport industry), and in the ICANN era, the newTLDs or the new top-level domains for people who have enough funds. This hierarchical structure helps in the assignment of different parts of the DNS tree to different entities thereby enhancing the control of administration while at the same time enhancing the connectivity of the system. For instance, while ICANN has the responsibility of the root zone, other organizations can manage their domains independently within the system, which makes the system very flexible and easy to administer.
+The Domain Name System is a hierarchical structure with the root domain (_._) at the top, then the Top Level Domains (TLDs), the generic TLDs (gTLDs) such as _.com_, _.org_, the country code TLDs (ccTLDs) such as _.uk_ or _.cz_, sponsored TLDs (sTLDs) for particular purposes like _.cat_ (not the animals, but the top-level domain for the Catalan linguistic and cultural community), _.edu_ (for Institutions of higher learning in the US) or _.aero_ (for members of the air transport industry), and in the ICANN era, the newTLDs or the new top-level domains for people who have enough money to spare. This hierarchical structure helps in the assignment of different parts of the DNS tree to different entities thereby enhancing the control of administration while at the same time enhancing the connectivity of the system. For instance, while ICANN has the responsibility of the root zone, other organizations can manage their domains independently within the system, which makes the system very flexible, resilient, robust, and easy to administer.
 
 The hierarchical and distributed nature of DNS has several consequences in several areas as shown below; The distribution of authority also has a tendency of eliminating single points of failure as each zone cane handled by several servers. The second is the caching system at different levels of the DNS which reduces the burden of the network and increases the rate of response to queries by storing frequently sought after records closer to the user. The third is the delegation model, which helps in management of regions while at the same time providing a clear chain of authority from the root servers, all the way to the individual domain records, globally.
 
@@ -157,7 +164,7 @@ The DNS architecture is composed of the following elements that work together to
 3. Authoritative Name Servers: These servers hold the real DNS records for particular domains and provide definitive answers to queries regarding domains within their zone.
 4. Recursive Resolvers: These systems sit in the middle between clients and authoritative servers and carry o but DNS queries on behalf of the end users, with very complex caching diameters to enhance on throughput and decrease on delay.
 
-The functioning of these components is done through a well-defined protocol that allows for both recursive and iterative queries; this helps in achieving reasonable resolution paths as well as convenience of the system. This architectural design allows DNS to deal with billions of queries in a day without faltering or crashing due to failures or attacks @rfc1034 @rfc1035.
+The functioning of these components is done through a well-defined protocol that allows for both recursive and iterative queries; this helps in achieving reasonable resolution paths as well as convenience of the system. This architectural design allows DNS to deal with billions of queries in a day without faltering or crashing due to failures, mis-configurations, or attacks @rfc1034 @rfc1035.
 
 == Importance of DNSSEC
 
@@ -262,15 +269,6 @@ Comparison with RSA:
 - Key Size: The 256-bit key of ECDSA is equivalent to the 3072-bit key of RSA.
 - Signature Size: The size of the signature of ECDSA is about 1/6 that of the signature of RSA for the same security level.
 
-Performance Considerations:
-- The signature generation time is 5-10 times faster than that of RSA.
-- The speed of verification is as good as that of RSA or even slightly better.
-
-Resource Usage:
-- Lower memory usage because of the smaller key sizes.
-- Lower network traffic due to the use of smaller signatures.
-- More effective use of CPU time for signing processes.
-
 === EdDSA (Edwards-curve Digital Signature Algorithm)
 
 EdDSA is the most recent development in DNSSEC cryptography @rfc8080, with enhanced performance and different security features compared to RSA and ECDSA.  It employs the twisted Edwards curves and brings in some improvements particularly for digital signatures @CryptSafeCurvesIntroduction.
@@ -289,11 +287,6 @@ Security Properties:
 - Easier and constant time implementation.
 - Stronger protection against side channel attacks.
 
-Performance Advantages:
-- Signature generation time is 20-30% faster.
-- Up to 50% faster verification.
-- More effective batch verification.
-
 Implementation benefits:
 - Less complex implementation means less chance of security vulnerabilities.
 - Deterministic signatures remove the need for entropy at the time of signing.
@@ -307,11 +300,11 @@ In quantum mechanical systems, superposition means that each qubit can exist in 
 
 === Quantum Computing and Cryptographic Threats
 
-The quantum computing systems can create major changes in the current cryptographic systems and methods used in cyber security. Today's public key cryptography is mainly based on the idea of the computational difficulty of certain mathematical problems in the traditional computing systems. The security of the RSA public key crypto-system, for instance, is based on the idea that there is no known method of factoring a large composite number into its two prime factors using conventional algorithms. However, cryptographic protocols such as DSA and Elliptic Curve Cryptography (ECC) are secure because it is hard to solve the discrete logarithm problem in classical computation.
+The quantum computing systems can create major changes in the current cryptographic systems and methods used in cyber security. Today's public key cryptography is mainly based on the idea of the computational difficulty of certain mathematical problems in the traditional computing systems. The security of the RSA public key crypto-system, for instance, is based on the idea that there is no known method of factoring a large composite number into its two prime factors using conventional algorithms. Cryptographic algorithms such as DSA and Elliptic Curve Cryptography (ECC) are secure because it is hard to solve the discrete logarithm problem in classical computation.
  
-However, these security assumptions are broken by quantum algorithms. In 1994, Shor's algorithm was published, which described a quantum computational approach to solving both the integer factorization and discrete logarithm problems in polynomial time – an exponential improvement on the best classical algorithms. This is a theoretical result and does not at present threaten the security of widely used public key systems, but it does show that sufficiently large quantum computers could break the cryptography that is used to protect a very large part of the world's data.
+However, these security assumptions are broken by quantum algorithms. In 1994, Shor's algorithm @365700 @doi_10.1137_S0097539795293172 was published, which described a quantum computational approach to solving both the integer factorization and discrete logarithm problems in polynomial time – an exponential improvement on the best classical algorithms. This is a theoretical result and does not at present threaten the security of widely used public key systems, but it does show that sufficiently large quantum computers could break the cryptography that is used to protect a very large part of the world's data.
  
-However, the latter one, Grover's search algorithm, offers a quadratic improvement for quantum search in an unstructured database, which affects the security parameters of symmetric keyed systems. Although less disastrous to the current cryptographic implementations than Shor's algorithm, Grover's algorithm demands the keys in symmetric systems to be twice as long to have the same level of security against quantum attacks.
+However, the latter one, Grover's search algorithm @10_1145_237814.237866, offers a quadratic improvement for quantum search in an unstructured database, which affects the security parameters of symmetric keyed systems. Although less disastrous to the current cryptographic implementations than Shor's algorithm, Grover's algorithm demands the keys in symmetric systems to be twice as long to have the same level of security against quantum attacks.
 
 Bernstein @Bernstein2009 lists three basic reasons why we need to focus on the Quantum-Safe cryptography now rather than later:
 
@@ -339,7 +332,7 @@ The shift to quantum secure cryptographic systems is also quite complex and one 
 
 The National Institute of Standards and Technology (NIST) @nist_pqc has launched a thorough standardization effort to deal with the cryptographic weaknesses brought about by quantum computing. This systematic endeavor is meant to define solid standards for quantum-resistant public-key cryptographic algorithms; an essential advancement in digital security architecture.
  
-The current cryptographic architecture, defined by NIST, is represented by several fundamental standard documents. Federal Information Processing Standard (FIPS) 186-4 is understood to be the Digital Signature Standard, which prescribes major rules for digital signature algorithms. Additional guidelines for key establishment protocols are shown in Special Publication SP 800-56A Revision 2 which covers discrete logarithm cryptography and SP 800-56B Revision 1 which targets integer factorization cryptography. These standards have effectively secured digital communications through the implementation of widely deployed algorithms such as RSA, DSA and elliptic curve cryptography. However, as detailed in NISTIR 8105, Report on Post-Quantum Cryptography, such algorithms have been found to have certain vulnerabilities to quantum computational attacks and therefore new quantum-resistant alternatives need to be developed and standardized.
+The current cryptographic architecture, defined by NIST, is represented by several fundamental standard documents. Federal Information Processing Standard (FIPS) 186-5 @national_institute_of_standards_and_technology_us_digital_2023 is understood to be the Digital Signature Standard, which prescribes major rules for digital signature algorithms. Additional guidelines for key establishment protocols are shown in Special Publication SP 800-56A Revision 3 @barker_recommendation_2018 which covers discrete logarithm cryptography and SP 800-56B Revision 2 @barker_recommendation_2019 which targets integer factorization cryptography. These standards have effectively secured digital communications through the implementation of widely deployed algorithms such as RSA, DSA and elliptic curve cryptography. However, as detailed in NIST IR 8105 @chen_report_2016, Report on Post-Quantum Cryptography, such algorithms have been found to have certain vulnerabilities to quantum computational attacks and therefore new quantum-resistant alternatives need to be developed and standardized.
  
 The NIST post-quantum cryptography standardization effort involves a thorough, three-phase assessment protocol. The first phase that took place between 2017 and 2019 was characterized by the submission of sixty-nine candidate algorithms. The first round of screening was carried o but to assess the preliminary security of the submitted algorithms and their basic implementation in terms of mathematical soundness and theoretical security.
  
@@ -375,19 +368,9 @@ In this section, an overview of the currently standardized PQC algorithms is giv
 
 The “Cryptographic Suite for Algebraic Lattices” (CRYSTALS) @crystals-kyber @crystals-dilithium is comprised of two cryptographic primitives: The Kyber system is an IND-CCA2 secure key encapsulation mechanism (KEM) and Dilithium is a strongly EUF-CMA secure digital signature scheme. These schemes are in fact conceived with the ability to hold their ground against large quantum computers, and have been p but forward as part of the NIST post-quantum cryptography project.
 
-*Module Lattices*
-
-We can consider module lattices as those lattices which are closer to the ones employed in defining the LWE problem than those employed in Ring LWE, yet simpler than the former. The following are the advantages that our cryptographic algorithms enjoy when they are implemented using these lattices, for a ring that has a sufficiently high degree (like 256):
- 
-The only operations required for Kyber and Dilithium for all security levels are: the Keccak variants, additions/multiplications in $Z_q$ where $q$ is a constant, and the NTT for the ring $Z_q[X]/(X^256+1)$. This means that changing the security level comes at virtually no cost of implementing the schemes again in software or hardware. It is sufficient to modify several parameters to transform an optimized implementation of a scheme at one security level into an optimized implementation at another security level. The lattices used in Kyber and Dilithium are less structured in the algebraic sense than those used for Ring LWE and are more similar to the unstructured lattices used in LWE. It is therefore possible that if any algebraic attacks against Ring LWE do appear (and there are none that we are aware of at this point), then they may be less effective against schemes like Kyber and Dilithium.
-
 === FALCON
 
-Fast-Fourier Lattice-based Compact Signature over NTRU (FALCON) @falcon is a cryptographic signature algorithm submitted to NIST Post-Quantum Cryptography Project on November 30th, 2017.
-
-The point of a post-quantum cryptographic algorithm is to keep on ensuring its security characteristics even faced with quantum computers. Quantum computers are deemed feasible, according to our current understanding of the laws of physics, but some significant technological issues remain to be solved in order to build a fully operational unit. Such a quantum computer would very efficiently break the usual asymmetric encryption and digital signature algorithms based on number theory (RSA, DSA, Diffie-Hellman, ElGamal, and their elliptic curve variants).
-
-Falcon is based on the theoretical framework of Gentry, Peikert and Vaikuntanathan for lattice-based signature schemes. We instantiate that framework over NTRU lattices, with a trapdoor sampler called "fast Fourier sampling". The underlying hard problem is the short integer solution problem (SIS) over NTRU lattices, for which no efficient solving algorithm is currently known in the general case, even with the help of quantum computers.
+Fast-Fourier Lattice-based Compact Signature over NTRU (FALCON) @falcon is a cryptographic signature algorithm based on the theoretical framework for lattice-based signature schemes. The framework is instantiated over NTRU lattices, with a trapdoor sampler called "fast Fourier sampling". The underlying hard problem is the short integer solution problem (SIS) over NTRU lattices, for which no efficient solving algorithm is currently known in the general case, even with the help of quantum computers.
 
 *Algorithm Highlights*
 
@@ -401,7 +384,7 @@ Falcon offers the following features:
 
 === SPHINCS#super[+]
 
-SPHINCS#super[+] @oswald_sphincs_2015 is a stateless hash-based signature scheme, which was submitted to the NIST post-quantum crypto project. The design advances the SPHINCS signature scheme, which was presented at EUROCRYPT 2015. It incorporates multiple improvements, specifically aimed at reducing signature size. @bernstein_sphincs_2019
+SPHINCS#super[+] @oswald_sphincs_2015 is a stateless hash-based signature scheme. The design advances the SPHINCS signature scheme, which was presented at EUROCRYPT 2015. It incorporates multiple improvements, specifically aimed at reducing signature size. @bernstein_sphincs_2019
 
 The submission proposes three different signature schemes:
 
@@ -413,13 +396,11 @@ These signature schemes are obtained by instantiating the SPHINCS#super[+] const
 
 The second round submission of SPHINCS#super[+] introduces a split of the above three signature schemes into a simple and a robust variant for each choice of hash function. The robust variant is exactly the SPHINCS#super[+] version from the first round submission and comes with all the conservative security guarantees given before. The simple variants are pure random oracle instantiations. These instantiations achieve abo but a factor three speed-up compared to the robust counterparts. This comes at the cost of a purely heuristic security argument.
 
-Prof. Ronen suggested @ronen2024 that if being stateless is very important, SPHINCS+ variant that can support a maximum of 2^16 signatures instead of 2^64 can be considered, such change will result in a much smaller signature.
-
 == Post-Quantum Cryptography: Additional Digital Signature Schemes
 
 In the PQC standardization process, NIST announced that the process is continuing with a fourth round, and the following KEMs are still under consideration: IKE, Classic  McEliece, HQC, and SIKE. However, there are no candidates for digital signatures under consideration any longer. Consequently, NIST is requesting more proposals for digital signatures to be considered in the PQC standardization process @alagic_status_2022. 
  
-The main interest of NIST is in additional general-purpose signature schemes that are not based on the structured lattices. For certain applications, e.g. certificate transparency,  NIST may be interested in signature schemes with short signatures and fast verification. NIST is not closed for  the additional submissions of structured lattice based signature schemes, however, the intention of the standard is to diversify post-quantum signature standards. Hence, if any structured lattice based signature proposal is made, it would have to be significantly better than CRYSTALS-Dilithium and FALCON in the relevant applications and/or must offer significantly greater security to be considered for standardization. @nist_additional_dss
+The main interest of NIST is in additional general-purpose signature schemes that are not based on the structured lattices. For certain applications, e.g. certificate transparency, NIST may be interested in signature schemes with short signatures and fast verification. NIST is not closed for the additional submissions of structured lattice based signature schemes, however, the intention of the standard is to diversify post-quantum signature standards. Hence, if any structured lattice based signature proposal is made, it would have to be significantly better than CRYSTALS-Dilithium and FALCON in the relevant applications and/or must offer significantly greater security to be considered for standardization. @nist_additional_dss
 
 The Additional Digital Signature Schemes is currently at the Round 2 and the following algorithms remain @alagic_status_2024.
 
@@ -437,13 +418,13 @@ The sizes of the secret key, the public key and the signatures can be found in @
 
 === SQIsign
 
-SQISign (for Short Quaternion and Isogeny Signature) @NISTPQC-ADD-R2:SQIsign25 is based on a mathematical correspondence between two seemingly distant mathematical worlds: supersingular elliptic curves and isogenies defined over finite fields on one side, maximal orders and ideals of quaternion algebras on the other side.  It is a new signature scheme from isogeny graphs of supersingular elliptic curves. The signature scheme is derived from a new one-round, high soundness, interactive identification protocol. Targeting the post-quantum NIST-1 level of security, our implementation results in signatures of 204 bytes, secret keys of 16 bytes and public keys of 64 bytes @sqisign_2020.
+SQIsign (for Short Quaternion and Isogeny Signature) @NISTPQC-ADD-R2:SQIsign25 is based on a mathematical correspondence between two seemingly distant mathematical worlds: supersingular elliptic curves and isogenies defined over finite fields on one side, maximal orders and ideals of quaternion algebras on the other side.  It is a new signature scheme from isogeny graphs of super-singular elliptic curves. The signature scheme is derived from a new one-round, high soundness, interactive identification protocol. Targeting the post-quantum NIST-1 level of security, our implementation results in signatures of 204 bytes, secret keys of 16 bytes and public keys of 64 bytes @sqisign_2020.
 
 SQIsignHD @sqisign_hd_2023 was the first variant of SQIsign to use higher dimensional isogeny representations. Its eight-dimensional variant is geared towards provable security but is deemed unpractical. Its four-dimensional variant is geared towards efficiency and has significantly faster signing times than SQIsign, but slower verification owing to the complexity of the four-dimensional representation. Its authors commented on the apparent difficulty of getting any improvement over SQIsign by using two-dimensional representations.
 
 SQIsign2D-West @sqisign_west_2023 introduces new algorithmic tools that make two-dimensional representations a viable alternative. These lead to a signature scheme with sizes comparable to SQIsignHD, slightly slower signing than SQIsignHD but still much faster than SQIsign, and the fastest verification of any known variant of SQIsign. We achieve this without compromising on the security proof: the assumptions behind SQIsign2D-West are similar to those of the eight-dimensional variant of SQIsignHD. Additionally, like SQIsignHD, SQIsign2D-West favourably scales to high levels of security Concretely, for NIST level I we achieve signing times of 80 ms and verifying times of 4.5 ms, using optimised arithmetic based on intrinsics available to the Ice Lake architecture. For NIST level V, we achieve 470 ms for signing and 31 ms for verifying.
 
-The SQISign submission in the Round 2 of the Additional Digital Signature Scheme is based on the SQIsign2D-West @NISTPQC-ADD-R2:SQIsign25.
+The SQIsign submission in the Round 2 of the Additional Digital Signature Scheme is based on the SQIsign2D-West @NISTPQC-ADD-R2:SQIsign25.
 
 The sizes of the secret key, the public key and the signatures can be found in @sqisign-sizes.
 
@@ -521,7 +502,6 @@ The sizes of the secret key, the public key and the signatures can be found in @
 
 === ANTRAG-512
 
-
 Antrag (Annular NTRU Trapdoor Generation) @cryptoeprint:2023-1335 introduce a novel trapdoor generation technique for Prest's hybrid sampler over NTRU lattices. Prest's sampler is used in particular in the recently proposed Mitaka signature scheme , a variant of the Falcon signature scheme, one of the candidates selected by NIST for standardization. Mitaka was introduced to address Falcon's main drawback, namely the fact that the lattice Gaussian sampler used in its signature generation is highly complex, difficult to implement correctly, to parallelize or protect against side-channels, and to instantiate over rings of dimension not a power of two to reach intermediate security levels. Prest's sampler is considerably simpler and solves these various issues, but when applying the same trapdoor generation approach as Falcon, the resulting signatures have far lower security in equal dimension. The Mitaka paper showed how certain randomness-recycling techniques could be used to mitigate this security loss, but the resulting scheme is still substantially less secure than Falcon (by around 20 to 50 bits of CoreSVP security depending on the parameters), and has much slower key generation.
 
 The new trapdoor generation techniques solves all of those issues satisfactorily: it gives rise to a much simpler and faster key generation algorithm than Mitaka's (achieving similar speeds to Falcon), and is able to comfortably generate trapdoors reaching the same NIST security levels as Falcon as well. It can also be easily adapted to rings of intermediate dimensions, in order to support the same versatility as Mitaka in terms of parameter selection. All in all, this new technique combines all the advantages of both Falcon and Mitaka (and more) with none of the drawbacks.
@@ -536,31 +516,36 @@ In this work, we focus on assessing the suitability of the existing post-quantum
 
 There are several ongoing proposals in the form of Internet Drafts that propose extending the DNSSEC protocol with PostQuantum Cryptography.
 
+=== Taking the quantum leap: Preparing DNSSEC for Post Quantum Cryptography
+
+Beernink @beernink has studied the impact of using FALCON-512 on the DNSSEC and suggested a solution that involves placing public keys on web servers to reduce DNSSEC record sizes. Using this approach of out-of-band key exchange, computationally more efficient algorithms such
+as Rainbow can be implemented at acceptable expense.  However, this introduces additional complexity and dependencies on the HTTP protocol and web servers for the DNS resolver operators.
+
 === Retrofitting post-quantum cryptography in internet protocols: a case study of DNSSEC
 
 Müller et al. @10.1145-3431832.3431838 provided a case study, analyzing the impact of PQC on the Domain Name System (DNS) and its Security Extensions (DNSSEC).  They have evaluated current candidate PQC signature algorithms in the third round of the NIST competition on their suitability for use in DNSSEC and show that three algorithms, partially, meet DNSSEC's requirements but also show where and how we would still need to adapt DNSSEC.
 
 === Stateful Hash-based Signatures For DNSSEC
 
-Fregly and van Rijswijk-Deij proposed @afrvrd-dnsop-stateful-hbs-for-dnssec-00 how to use stateful hash-based signature schemes (SHBSS) with the DNS Security Extensions (DNSSEC). The schemes include the Hierarchical Signature System (HSS) variant of Leighton-Micali Hash-Based Signatures (HSS/LMS), the eXtended Merkle Signature Scheme (XMSS), and XMSS Multi-Tree (XMSS^MT). In addition, DNSKEY and RRSIG record formats for the signature algorithms are defined and new algorithm identifiers are described.
+Fregly and van Rijswijk-Deij @afrvrd-dnsop-stateful-hbs-for-dnssec-00 proposed how to use stateful hash-based signature schemes (SHBSS) with the DNS Security Extensions (DNSSEC). The schemes include the Hierarchical Signature System (HSS) variant of Leighton-Micali Hash-Based Signatures (HSS/LMS), the eXtended Merkle Signature Scheme (XMSS), and XMSS Multi-Tree (XMSS^MT). In addition, DNSKEY and RRSIG record formats for the signature algorithms are defined and new algorithm identifiers are described.
 
 === Stateless Hash-based Signatures in Merkle Tree Ladder Mode (SLH-DSA-MTL) for DNSSEC
 
 Fregly et al. @fregly-dnsop-slh-dsa-mtl-dnssec-04 proposed how to apply the Stateless Hash-Based Digital Signature Algorithm in Merkle Tree Ladder mode to the DNS Security Extensions.  This combination is referred to as the SLH-DSA-MTL Signature scheme.  This document describes how to specify SLH-DSA-MTL keys and signatures in DNSSEC.  It uses both the SHA2 and SHAKE family of hash functions.  This document also provides guidance for use of EDNS(0) in signature retrieval.
 
-Sury @sury-dnsop pointed out that a malicious zone operator can return a different rung for every query which effectively makes the resolver request a new signed ladder every time it makes a remote DNS request.  This removes any benefit that the resolvers gain from using the Merkle Tree Ladder mode.  A resistance against the repeated key refetching needs to be built into the protocol, and putting limits on frequency is not going to be enough.
+Surý @sury-dnsop pointed out that a malicious zone operator can return a different rung for every query which effectively makes the resolver request a new signed ladder every time it makes a remote DNS request.  This removes any benefit that the resolvers gain from using the Merkle Tree Ladder mode.  A resistance against the repeated key re-fetching needs to be built into the protocol, and putting limits on frequency is not going to be enough.
 
 = Methodology
 
 == Research Design
 
-For the purpose of this study, the selected post-quantum algorithms will be implemented in the BIND 9 open-source DNS server.  BIND 9 @bind9-arm is a complete implementation of the DNS protocol. BIND 9 can be configured (using its named.conf file) as an authoritative name server, a resolver, and, on supported hosts, a stub resolver. While large operators usually dedicate DNS servers to a single function per system, smaller operators will find that BIND 9’s flexible configuration features support multiple functions, such as a single DNS server acting as both an authoritative name server and a resolver.
+For the purpose of this study, the selected Quantum-Safe algorithms will be implemented in the BIND 9 open-source DNS server.  BIND 9 @bind9-arm is a complete implementation of the DNS protocol. BIND 9 can be configured (using its `named.conf` file) as an authoritative name server, a resolver, and, on supported hosts, a stub resolver. While large operators usually dedicate DNS servers to a single function per system, smaller operators will find that BIND 9’s flexible configuration features support multiple functions, such as a single DNS server acting as both an authoritative name server and a resolver.
 
 The implementation of each post-quantum algorithm will then be used to test various phases of DNSSEC deployment.  In all phases, the current DNSSEC algorithms will be tested along with the selected post-quantum algorithms for a comparison.  Specifically RSASHA256 with 2048-bit keys, ECDSAP256SHA256 and ED25519 algorithms will be used.
 
 === Testing Environment
 
-The testing environment will be Ubuntu Linux 24.04 running on a specific machine rather than in the "cloud".  The physical hardware was chosen to control the stable environment for all the conducted tests.  The system will be solely used for the testing, so no other users can affect the measurements.  Also the extra care will be taken to make sure the random generator for the system will have enough entropy for the duration of the tests, so the measurements are not affected by the lack of entropy from the operating system.
+The testing environment will be Ubuntu Linux 24.04 running on a specific machine rather than in the "cloud".  The physical hardware was chosen to control the stable environment for all the conducted tests.  The system will be solely used for the testing, so no other users can affect the measurements.  An extra care will be taken to make sure the random generator for the system will have enough entropy for the duration of the tests, so the measurements are not affected by the lack of entropy from the operating system.
 
 === Software Used
 
@@ -594,41 +579,41 @@ Each of the algorithms will be evaluated using several metrics.
 
 === DNS transport protocol
 
-DNS protocol can use UDP or TCP as the transport protocol.  It is also possible to use recently standardized encrypted DNS-over-QUIC (DoQ; FIXME: RFC ????) on top of the UDP protocol, and DNS-over-TLS (DoT) or DNS-over-HTTP (DoH) on top of the TCP protocol.
+DNS protocol can use UDP or TCP as the transport protocol.  It is also possible to use recently standardized encrypted DNS-over-QUIC (DoQ) @rfc9250 on top of the UDP protocol, and DNS-over-TLS (DoT) @rfc7858 or DNS-over-HTTPS (DoH) @rfc8484 on top of the TCP protocol.
 
-There's a major difference in the performance between the two main families (UDP vs TCP).  The UDP protocol is stateless and has no connection negotiation and thus the DNS server can reach millions of responses per second even on the commodity hardware.  The TCP protocol is state-full, the operating system kernel needs to keep state, opening the TCP connection requires three-way handshake, and closing the TCP connection requires four-way handshake.  Even with optimizations like TCP Fast Open that can send the initial data within the final IP packet of the three-way handshake, the DNS protocol can't be fully switched from UDP to TCP without major and extensive upgrade of the DNS infrastructure.  Any new PQC DNSSEC algorithm that would require the DNS protocol to use TCP for majority of the operations would have to bring major benefits to the security of the Internet as whole.
+There's a major difference in the performance between the two main families (UDP vs TCP).  The UDP protocol is stateless and has no connection negotiation and thus the DNS server can reach millions of responses per second even on the commodity hardware.  The TCP protocol is state-full, the operating system kernel needs to keep state, opening the TCP connection requires three-way handshake, and closing the TCP connection requires four-way handshake.  Even with optimizations like TCP Fast Open @rfc7413 that can send the initial data within the final IP packet of the three-way handshake, the DNS protocol can't be fully switched from UDP to TCP without major and extensive upgrade of the DNS infrastructure.  Any new DNSSEC algorithm that would require the DNS protocol to use TCP for majority of the operations would have to bring major benefits to the security of the Internet as whole.
 
 === IP Fragmentation Avoidance in DNS over UDP
 
-The original DNS specification limited the maximum DNS message size to 512 octets (FIXME: cite RFC 1034/35).  This limitation has been removed via the widely deployed Extension Mechanisms for DNS (EDNS(0)).  This extension of the DNS protocol enables a DNS receiver to indicate a maximum UDP message size capacity, which allows the DNS server to send larger DNS responses over UDP protocol. However, large DNS/UDP messages are more likely to be fragmented, and IP fragmentation has exposed weaknesses in the application protocols.  It is possible to avoid IP fragmentation in DNS by limiting the response size where possible and signaling the need to upgrade from UDP to TCP transport where necessary.  (FIXME: Cite RFC 9715).
+The original DNS specification limited the maximum DNS message size to 512 octets @rfc1034 @rfc1035.  This limitation has been removed via the widely deployed Extension Mechanisms for DNS (EDNS(0)) @rfc6891.  This extension of the DNS protocol enables a DNS receiver to indicate a maximum UDP message size capacity, which allows the DNS server to send larger DNS responses over UDP protocol. However, large DNS/UDP messages are more likely to be fragmented, and IP fragmentation has exposed weaknesses in the application protocols.  It is possible to avoid IP fragmentation in DNS by limiting the response size where possible and signaling the need to upgrade from UDP to TCP transport where necessary @rfc9715.
 
-RFC 9715 describe various techniques to avoid IP fragmentation of DNS message over UDP protocol applicable for use on the global Internet. In the Appendix A, the authors discuss the maximum safe UDP message size that's is not going to be fragmented on the IP level, and they made following observations: 
+Vixie and Fujiwara @rfc9715 describe various techniques to avoid IP fragmentation of DNS message over UDP protocol applicable for use on the global Internet. In the Appendix A, the authors discuss the maximum safe UDP message size that's is not going to be fragmented on the IP level, and they made following observations: 
 
  - "Most of the Internet, especially the inner core, has an MTU of at least 1500 octets.  Maximum DNS/UDP payload size for IPv6 on an MTU 1500 Ethernet is 1452 (1500 minus 40 (IPv6 header size) minus 8 (UDP header size)).  To allow for possible IP options and distant tunnel overhead, the recommendation of default maximum DNS/UDP payload size is 1400."
 
- - "[FIXME: Huston2021] analyzes the result of [FIXME: DNSFlagDay2020] and reports that their measurements suggest that in the interior of the Internet between recursive resolvers and authoritative servers, the prevailing MTU is 1500 and there is no measurable signal of in this part of the Internet.  They propose that their measurements suggest setting the EDNS(0) requestor's UDP payload size to 1472 octets for IPv4 and 1452 octets for IPv6."
+ - "Huston and Damas @huston2021 analyzes the result of DNS Flag Day 2020 @dnsflagday2020 and reports that their measurements suggest that in the interior of the Internet between recursive resolvers and authoritative servers, the prevailing MTU is 1500 and there is no measurable signal of in this part of the Internet.  They propose that their measurements suggest setting the EDNS(0) requestor's UDP payload size to 1472 octets for IPv4 and 1452 octets for IPv6."
 
 === The Public Key Size
 
-Firstly, the public key of the algorithm has to fit into the DNSKEY Resource Record, but this is not the only metric.  The current DNSSEC setup include at least two DNSKEY records - one for Key Signing Key (KSK) and one for Zone Signing Key (ZSK).  The space for ZSK and KSK rotation needs to be also considered.  And finally, the whole DNSKEY Resource Record Set (RRSet) is signed with at least one RRSIG signature, possibly with more.  Thus the overall consideration abo but the public key needs to span from one DNSKEY for Combined Signing Key (KSK) and a single signature, to three DNSKEY RRs with two RRSIG Resource Records.  Majority of DNS traffic uses UDP protocol with the maximum size of the UDP payload of 1232, but for the purposes of this work, we will consider sizes up to 1452 octets.  Optionally, if the DNS payload cannot fit into the UDP packet, the DNS server will mark the DNS answer with Truncation (TC) flag and the DNS client should use TCP to get the answer.  Maximum size of the DNS message over TCP is limited to 16-bit length (64k), but such large TCP message are impractical.
+Firstly, the public key of the algorithm has to fit into the DNSKEY Resource Record, but this is not the only metric.  The current DNSSEC setup include at least two DNSKEY records - one for Key Signing Key (KSK) and one for Zone Signing Key (ZSK) @rfc6781.  The space for ZSK and KSK rotation needs to be also considered.  And finally, the whole DNSKEY Resource Record Set (RRSet) is signed with at least one RRSIG signature, possibly with more.  Thus the overall consideration abo but the public key needs to span from one DNSKEY for Combined Signing Key (KSK) and a single signature, to three DNSKEY RRs with two RRSIG Resource Records.  Majority of DNS traffic uses UDP protocol with the maximum size of the UDP payload of 1232, but for the purposes of this work, we will consider sizes up to 1452 octets @rfc9715.  Optionally, if the DNS payload cannot fit into the UDP packet, the DNS server will mark the DNS answer with Truncation (TC) flag and the DNS client should use TCP to get the answer.  Maximum size of the DNS message over TCP is limited to 16-bit length (64k), but such large TCP message are impractical @rfc1034 @rfc1035.
 
-It also needs to be considered, that typical ISP-level DNS resolver might need to resolver millions of different zones, possibly validating all of them.  Having large public keys might make the caching impractical leading to high churn in the DNS resolver cache and more cache-misses.
+It also needs to be considered, that typical ISP-level DNS resolver might need to resolve millions of different zones, possibly validating all of them.  Having large public keys might make the caching impractical leading to high churn in the DNS resolver cache and more cache-misses.
 
-It should be also noted, that any algorithm used for DNSSEC needs to be considered from the viewpoint of using such setup for an attack.  There are multiple attack vectors on DNS that cane amplified using large public key sizes.
+It should be also noted, that any algorithm used for DNSSEC needs to be considered from the viewpoint of using such setup for an attack.  There are multiple attack vectors on DNS that can be amplified using large public key sizes.
 
 The first type of the attack is any attack on the resolver itself.  If the attacker can force the resolver to download, validate and store large public keys in the DNS resolver cache, they would be able to make the DNS resolver to consume bandwidth, CPU resources and memory resources.
 
-The second type of the attack is using large Resource Records for Distributed Denial of Service by using the DNS resolver in the reflection type of the attack.  The nature of the UDP with the lack of reverse-path filtering (FIXME: cite BCP38) allows the attacker to send the DNS queries over UDP with spoofed source IP address making the DNS resolver to send the DNS answer to the victim IP address.  Combine this with small size of the DNS queries and relatively large sizes of DNS answers this allows 10-100x amplification factor in such attacks.
+The second type of the attack is using large Resource Records for Distributed Denial of Service by using the DNS resolver in the reflection type of the attack.  The nature of the UDP with the lack of reverse-path filtering @rfc2827 allows the attacker to send the DNS queries over UDP with spoofed source IP address making the DNS resolver to send the DNS answers to the victim IP address.  This creates a very efficient type of effect when combined with small size of the DNS queries and relatively large sizes of DNS answers that allows 10-100x amplification factor.
 
 At least these attack vectors needs to be considered when adding new PQC algorithms to DNSSEC.
 
 === The Signature Sizes
 
-In DNSSEC, the signatures are stored in the RRSIG Resource Records.  The RRSIG RRs are attached to DNS answers when DNSSEC responses are requested enlarging the answers by fixed amount.
+In DNSSEC, the signatures are stored in the RRSIG Resource Records (RRs).  The RRSIG RRs are attached to DNS answers when DNSSEC responses are requested enlarging the answers by fixed amount.
 
-As with the public key sizes, we need to consider the maximum DNS message payload in the UDP datagrams and consider the possible attack vectors similar to the ones listed in the Public Key Sizes section.
+As with the public key sizes, we need to consider the maximum DNS message payload (EDNS(0) buffer size) in the UDP datagrams and consider the possible attack vectors similar to the ones listed in the Public Key Sizes section.
 
-The overall ratio of the RRSIG RRs with signatures to DNSKEYs is many to few.  There's usually only few DNSKEYs in the zones, but many signatures.  The choice of PQC algorithm for DNSSEC should prefer algorithm with smaller signature sizes rather than smaller public key sizes.
+The overall ratio of the RRSIG RRs with signatures to DNSKEYs is many to few.  There's usually only few DNSKEYs in the zones, but many signatures.  The choice of the new algorithm for DNSSEC should prefer algorithm with smaller signature sizes rather than smaller public key sizes.
 
 === The Signing Speed
 
@@ -640,7 +625,7 @@ Thus it might seem that the signing speed is not important factor when choosing 
 
 2. Online Signing – some DNS servers allows mode of operation where the Resource Records are signed at the time of the DNS queries and possibly cached.  This is required for DNS zones where the Resource Records are generated.  As a specific example, some DNS servers allow the IPv6 reverse Resource Records (PTR) to be synthetised according to the local policy and rules.  Signing synthetised records must be done at the time of the generation and thus signing speed is important for any DNS operator using this function of the DNS server.
 
-3. NSEC Grey Lies - The NSEC Resource Records provide means for DNS servers to provide a proof of non-existence of a Resource Records.  However, such proof reveals all the zone contents due to the design of the NSEC Resource Records (FIXME:cite?).  To overcome this deficiency Hashed Authenticated Denial of Existence records were added to DNSSEC3 - NSEC3 Resource Records.  Daniel J.ernstein showed that due to the nature of DNS data, the NSEC3 records might used to reveal most of the zone contents using offline methods.  At least one large DNS operator thus introduced a method called NSEC(3) white lies (FIXME: Add RFCs).  And NSEC or NSEC3 white lies can onlye implemented with online signing.  Thus the signing speed is also very important for the DNS operators using NSEC(3) white lies in the DNS zones they are hosting.  (FIXME: https://blog.cloudflare.com/dnssec-complexities-and-considerations/
+3. NSEC Grey Lies - The NSEC Resource Records provide means for DNS servers to provide a proof of non-existence of a Resource Records.  However, such proof reveals all the zone contents due to the design of the NSEC Resource Records.  To overcome this deficiency Hashed Authenticated Denial of Existence records were added to DNSSEC3 - NSEC3 Resource Records.  Daniel J.ernstein showed that due to the nature of DNS data, the NSEC3 records might used to reveal most of the zone contents using offline methods.  At least one large DNS operator thus introduced a method called NSEC(3) white lies @rfc7129.  And NSEC or NSEC3 white lies can only be implemented with online signing.  Thus the signing speed is also very important for the DNS operators using NSEC(3) white lies in the DNS zones they are hosting. @cloudflare-dnssec
 
 === The Verification computation overhead
 
@@ -648,7 +633,7 @@ When the DNS Resolver receives signed answer from the authoritative server, it n
 
 As with the previous considerations on size, the normal mode of operation is not of a large concern because the received DNS answers will be stored in the DNS resolver cache, but the outliers are the real minefield here.
 
-It was shown that if the attacker can make the DNS resolver to process many DNSKEYs and many RRSIGs, it can grid the resolver to almost full stop (FIXME: Add KeyTrap reference...).  At least in BIND 9, the KeyTrap attack was mitigatedy limiting the number of DNSKEY-RRSIG pairs and also by offloading the cryptographical operations to a different thread-pool, so it does not interfere with non-DNSSEC traffic and the server function of the DNS server when responding DNS queries for local zones or data already in the cache of the DNS resolver.
+It was shown that if the attacker can make the DNS resolver to process many DNSKEYs and many RRSIGs, it can grid the resolver to almost full stop @heftrig2024hardertryharderfail.  At least in BIND 9, the KeyTrap attack was mitigated by limiting the number of DNSKEY-RRSIG pairs and also by offloading the cryptographical operations to a different thread-pool, so it does not interfere with non-DNSSEC traffic and the server function of the DNS server when responding DNS queries for local zones or data already in the cache of the DNS resolver.
 
 The other trap lies again in the field of Authenticated Denial of Existence (NSEC).  An attacker can use a technique called Pseudo-Random Subdomain-Attack (PRSD) to force the DNS resolver to ask the upstream authoritative servers again and again for random subdomains that don't exist and validate the NSEC answer from the authoritative server again and again. The Hashed Authenticated Denial of Existence (NSEC3) records suffer from the exactly same problem, and the same mechanism cane used to mitigate the attack. This cane mitigated by Aggressive Use of DNSSEC-Validated Cache (FIXME: RFC 8198, 9077) - using the already cached Authenticated Denial of Existence records from the DNS resolver cache to validate the existence/non-existence of the queried name to prevent the sending the DNS query to the upstream DNS server in the case we already know that the pseudo-random sub-domain lies within the range covered by the NSEC(3) record.  The implication of this is that for any PQC algorithm slower than the existing algorithms, the Aggressive Use of DNSSEC-Validated Cache must be implemented in any DNS server implementation along with PQC algorithm validation.
 
@@ -670,22 +655,23 @@ The SQIsign algorithm would suit the intended usage in the DNS because of the sm
 
 === MAYO
 
-The MAYO algorithm has been included in the testing as the signature sizes fit very well into DNS.  Unfortunately, the public key size is bit more on the higher end.  MAYO is one of the Oil and Vinegar based schemes.
+The MAYO algorithm has been included in the testing as the signature sizes fit very well into DNS. Unfortunately, the public key size is bit more on the higher end. MAYO is one of the Oil and Vinegar based schemes.
 
 === ANTRAG-512
 
-The last algorithm included in this work hasn't be submitted into the NIST Additional Digital Signature Scheme Round 2, but it has been presented during ASIACRYPT (FIXME).  It builds on the FALCON digital signing scheme, but achieves smaller public key and signature sizes compared to other latice-based algorithms.  Specifically, the public key size is smaller than both FALCON-512 and HAWK-512, and the signature size is smaller than FALCON-512 and only slightly larger than HAWK-512.
+The last algorithm included in this work hasn't be submitted into the NIST Additional Digital Signature Scheme Round 2, but it has been presented during ASIACRYPT @cryptoeprint:2023-1335.  It builds on the FALCON digital signing scheme, but achieves smaller public key and signature sizes compared to other lattice-based algorithms.  Specifically, the public key size is smaller than both FALCON-512 and HAWK-512, and the signature size is smaller than FALCON-512 and only slightly larger than HAWK-512.
 
 == Implementation Status
 
 During the implementation of the new cryptographic algorithms, the cryptographic API in the BIND 9 has been cleaned up.  Duplicate functions (`verify`, and `verify2`) have been merged and unused functions (`createctx2`, `computesecret`, `paramcompare`, and `cleanup`) have been removed.  This has been submitted to the upstream project in the `ondrej/dst_api-cleanup` branch.
 
 During implementation of the algorithm with larger secret key, public key or signature sizes, it was discovered that additional modifications to the BIND 9 code were needed, specifically sizes of various internal buffers and data structures that hold the secret key, public keys and signatures.
+
 Additionally, the limits of allowed outgoing DNS queries had to be increased because the increase in the DNS response sizes causes some of the queries to fallback to TCP which in turn would increase the number of outgoing queries needed to resolve a domain name.  For some algorithms, this would lead to initial failures in the DNS resolving, skewing the results.
 
 === FALCON
 
-As the FALCON algorithm has been already standardized by NIST, multiple implementations exists.  PQclean (FIXME) project provides clean, tested and vetted implementation of the FALCON algorithm that can be easily integrated into other projects.  The liboqs library (FIXME) that extends OpenSSL library has also been considered, but for the testing purposes an implementation that can be fully embedded into BIND 9 project was more suitable.
+As the FALCON algorithm has been already standardized by NIST, multiple implementations exists.  PQclean project @cryptoeprint:2022_337 provides clean, tested and vetted implementation of the FALCON algorithm that can be easily integrated into other projects.  The liboqs library @cryptoeprint:2016_1017 that extends OpenSSL library has also been considered, but for the testing purposes an implementation that can be fully embedded into BIND 9 project was more suitable.
 
 The copy of the FALCON PQclean code has been embedded into BIND 9 project in the `ondrej/pqc-falcon` project.
 
@@ -695,7 +681,7 @@ HAWK project provides a neat implementation suitable for direct embedding into o
 
 === SQISign
 
-The official implementation of the SQIsign algorithm has been updated for the Round 2 submission and is now based on the SQIsign-2D-West version of the algorithm.  This implementation does solve some of the deficiencies of the previous version.  The most serious problem that the previous version has was thread-safety.  Still, the implementation mostly focuses on the NIST submission and doesn't make it easy for other projects to use and test the algorithm.  The implementation is riddled with overly complicated CMake build system that is very hard to modify.  The build system produces only static libraries that are not suitable for linking into other projects as that would require linking multiple static libraries scattered across multiple directories.  Therefore the implementation has been modified to produce shared libraries that can be dynamically linked into the BIND 9.  The SQIsign authors provide two variants - the reference implementation and the broadwell-optimized implementation.  The reference implementation has been used in this project as the broadwell-optimized implementation includes some hand-crafted assembly that is not PIC (Position Independent Code) compatible and can't be used when linking the code into shared library.
+The official implementation of the SQIsign algorithm has been updated for the Round 2 submission and is now based on the SQIsign-2D-West version of the algorithm.  This implementation does solve some of the deficiencies of the previous version.  The most serious problem that the previous version had was thread-safety.  Still, even the current Round 2 implementation mostly focuses on the NIST submission and doesn't make it easy for other projects to use and test the algorithm.  The implementation is riddled with overly complicated CMake build system that is very hard to modify.  The build system produces only static libraries that are not suitable for linking into other projects as that would require linking multiple static libraries scattered across multiple directories.  For the purposes of this study, the implementation has been modified to produce shared libraries that can be dynamically linked into the BIND 9.  The SQIsign authors provide two variants - the reference implementation and the Broadwell-optimized implementation.  The reference implementation has been used in this project as the Broadwell-optimized implementation includes some hand-crafted assembly that is not Position-Independent-Code compatible and can't be used when linking the code into shared library.
 
 The implementation also currently doesn't produce public header files.  There are three files in the `./include` directory: `mem.h`, `rng.h` and `sig.h`.  The build system has been modified for the purposes of this work to install these files to `sqisign/{mem,rng,sig}.h`, but generally speaking the `rng.h` header exports two functions called `randombytes_init()` and `randombytes()` that are not really suitable to be used in the common name-space.  Those functions should be moved under the `sqisign_` prefixed name-space.
 
@@ -713,7 +699,9 @@ MAYO at the NIST Security Level 1 has been tested and marked as MAYO-I below.
 
 === ANTRAG
 
-The ANTRAG authors provided a implementation in a form of a benchmark.  The implementation is definitely not suitable for integration into other projects, but the integration has been completed for the purposes of this work by integrating the source code of ANTRAG-512 into the BIND 9 source code and embedding the GMP (FIXME) shared library into the source tree.  The result can be found in the `ondrej/pqc-antrag` branch of the BIND 9 source code repository.
+The ANTRAG authors provided a implementation in a form of a benchmark.  The implementation is definitely not suitable for integration into other projects, but the integration has been completed for the purposes of this work by integrating the source code of ANTRAG-512 into the BIND 9 source code and embedding the GMP shared library into the source tree.  The result can be found in the `ondrej/pqc-antrag` branch of the BIND 9 source code repository.
+
+Antrag-512 variant has been tested in this study.
 
 == Experimental Setup
 
@@ -721,9 +709,9 @@ The measurements in this experiment has been conducted on two different platform
 
 === Local testing
 
-The local testing has been conducted on System76 Meerkat machine that features Intel® Core™ Ultra 7 155H processor (FIXME: https://www.intel.com/content/www/us/en/products/sku/236847/intel-core-ultra-7-processor-155h-24m-cache-up-to-4-80-ghz/specifications.html).  This processor includes 6 performance cores, 8 efficient cores and 2 low power efficient-cores.  To achieve a stability in the benchmarks, the Intel® Turbo Boost and Hyper-Threading have been disabled, and the benchmarking has been pinned to the the 6 performance cores.
+The local testing has been conducted on System76 Meerkat machine that features Intel® Core™ Ultra 7 155H processor.  This processor includes 6 performance cores, 8 efficient cores and 2 low power efficient-cores.  The full specification of the processor can be found at https://www.intel.com/content/www/us/en/products/sku/236847/intel-core-ultra-7-processor-155h-24m-cache-up-to-4-80-ghz/specifications.html.
 
-The Intel® Turbo Boost has been disabled with `echo 1 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo` command, the Hyper-Threading has been disabled using `echo off | sudo tee /sys/devices/system/cpu/smt/control` command and the performance cores has been selected using the `lscpu --all --extended` utility:
+To achieve a stability in the benchmarks, the Intel® Turbo Boost and Hyper-Threading have been disabled, and the benchmarking has been pinned to the the 6 performance cores.  The Intel® Turbo Boost has been disabled with `echo 1 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo` command, the Hyper-Threading has been disabled using `echo off | sudo tee /sys/devices/system/cpu/smt/control` command and the performance cores has been selected using the `lscpu --all --extended` utility:
 
 #figure(
     table(
@@ -759,13 +747,13 @@ The Intel® Turbo Boost has been disabled with `echo 1 | sudo tee /sys/devices/s
     caption: [Output of the `lscpu` command after disabling the Intel Turbo-Boost and the Hyper-Threading],
 ) <lscpu>
 
-The testing command has been limited to the selected CPU using the `taskset -c 0,1,3,6,9,10` command, and the hyperfine (FIXME: https://github.com/sharkdp/hyperfine) – a command-line benchmarking tool that provides statistical analysis - has been used to run the commands several times in a row.
+The testing command has been limited to the selected CPU using the `taskset -c 0,1,3,6,9,10` command, and the hyperfine (https://github.com/sharkdp/hyperfine) – a command-line benchmarking tool that provides statistical analysis - has been used to run the commands several times in a row.
 
 In the local testing, the key generation times, signing and verification times has been tested using the real DNS zones of various sizes located on the `tmpfs` file system.  The `tmpfs` file system is located in the memory of the operating system, thus it removes the effects of the solid state disk latency.
 
 === Remote testing
 
-The second part of the testing is using the BIND 9 testing environment that simulates the DNS resolver traffic provided by Internet Service Provider (ISP).  Permission to name the ISP was not provided.
+The second part of the testing is using the BIND 9 testing environment that replays the DNS resolver traffic provided by an anonymous Internet Service Provider (ISP).  Permission to name the ISP was not provided.
 
 A mock DNS root zone server has been set up with the copy of the DNS root zone signed with each of the tested algorithms.  For each of the tested algorithms:
 
@@ -779,7 +767,7 @@ BIND 9 source code on the abovementioned git branches has been modified to use t
 
 == Secret Key, Public Key and Signature Sizes
 
-In the @sizes, summary of Secret Key, Public Key and Signature sizes are given.  The raw sizes without the encapsulation in the DNS protocol are listed.  It has to be noted that while all Public Key and Signature sizes fit within our chosen limit of 1452 octets, the DNS protocol will enlarge the final UDP message sizes.
+In the @sizes, summary of Secret Key, Public Key and Signature sizes are given.  The raw sizes without the encapsulation in the DNS protocol are listed.  It has to be noted that while all Public Key and Signature sizes fit within our chosen limit of `1452` octets, the DNS protocol will enlarge the final UDP message sizes.
 
 #figure(
     table(
@@ -891,7 +879,7 @@ Usually, the individual DNS Resource Records in the DNS Zones are only signed on
 
 In the @signing-times, the times to sign the current Root Zone are listed.  For each measured algorithm, the process was repeated $100$ times to stabilize the performance and the measurement and $10$ warmup rounds were used.
 
-The Root Zone was downloaded from https://www.internic.net/domain/root.zone.  The existing DNSSEC records were stripped using `ldns-read-zone -s` utility and the exisint *DNSKEY* records were removed.  Afterwards, the Root Zone was pre-compiled from the plain text zone file format into raw zone format to minimize the effect of parsing the text zone file format.  There were $2790$ signatures generated with each `dnssec-signzone` invocation.  Post-signing zone verification has been disabled.
+The Root Zone was downloaded from https://www.internic.net/domain/root.zone.  The existing DNSSEC records were stripped using `ldns-read-zone -s` utility and the existing *DNSKEY* records were removed.  Afterwards, the Root Zone was pre-compiled from the plain text zone file format into raw zone format to minimize the effect of parsing the text zone file format.  There were $2790$ signatures generated with each `dnssec-signzone` invocation.  Post-signing zone verification has been disabled.
 
 The zone signing is multi-threaded and the testing was pinned to these 6 performance cores with HyperThreading and Intel Turbo Boost disabled.
 
@@ -907,13 +895,14 @@ Following arguments were used `dnssec-signzone -n 6 -P -x -S -o . -I raw -O raw 
       [HAWK-512],					[$261.0$],	  [$9.6$],    [$49821.873$],  [$122.6$],
       [SQIsign-I],				[$54528.1$],	[$67.9$],   [$51.038$],     [$11971.8$],
       [MAYO-I],						[$1086.6$],	  [$48.7$],   [$2746.081$],   [$110.5$],
-      [ANTRAG-512],				[$5339.6$],	  [$111.2$],  [$546.955$],    [$112.8$],
+      [ANTRAG-512 #footnote[During the signing process, it was discovered that Antrag-512 implementation has a implementation error related to multi-threaded operations and the signing process has to use only single thread for signing.]],				[$5339.6$],	  [$111.2$],  [$546.955$],    [$112.8$],
       [RSASHA256-2048],		[$845.7$],	  [$3.0$],    [$3980.056$],   [$113.5$],
       [ECDSAP256SHA256],	[$218.1$],	  [$10.2$],   [$44286.417$],  [$109.9$],
       [ED25519],					[$240.6$],	  [$6.3$],    [$47288.937$],  [$106.5$],
     ),
     caption: [DNSSEC Zone Signing Times in milliseconds],
 ) <signing-times>
+
 
 === Zone Verification Times
 
@@ -944,19 +933,15 @@ Following arguments were used `dnssec-verify -I raw -o . -x db.root.signed` to v
     caption: [DNSSEC Zone Verification Times in milliseconds],
 ) <verification-times>
 
-- Comparison of PQC schemes in terms of key generation, signing, and verification times. 
-- Impact on DNSSEC response times and bandwidth usage. 
-
 == DNS Resolver Benchmarking
 
-In the previous sections, the sizes of the DNS messages and the speed of DNSSEC signing and verification were evaluated.  In this sections, everything will be put together into a DNS Resolver benchmarking test.  Modified BIND 9 with support for the above mentioned algorithms was used for benchmarking.
+In the previous sections, the sizes of the DNS messages and the speed of DNSSEC signing and verification were evaluated.  In this sections, everything will be put together into a DNS Resolver benchmarking test.  Modified BIND 9 with support for the abovementioned algorithms was used for the benchmarking.
 
 === Experiment Setup
 
-BIND 9 team already has a setup for benchmarking DNS Resolver called Shotgun CI that combines GitLab CI @gitlab-ci and DNS Shotgun.
+The open source BIND 9 project already has a setup for benchmarking DNS Resolver called Shotgun CI that combines GitLab CI @gitlab-ci and DNS Shotgun.
 
-DNS Shotgun @dns-shotgun is a realistic DNS benchmarking tool which supports multiple transport protocols.  It supports UDP, TCP, DNS-over-TLS (DoT), and DNS-over-HTTPS (DoH).  DNS Shotgun is capable of simulating hundreds of thousands of DoT/DoH
-clients and it exports a number of statistics, such as query latencies, number of handshakes and connections, response rate, response codes etc. in JSON format.  The toolchain also provides scripts that can plot these into readable charts.
+DNS Shotgun @dns-shotgun is a realistic DNS benchmarking tool which supports multiple transport protocols.  It supports UDP, TCP, DNS-over-TLS (DoT), and DNS-over-HTTPS (DoH).  DNS Shotgun is capable of simulating hundreds of thousands of DoT/DoH clients and it exports a number of statistics, such as query latencies, number of handshakes and connections, response rate, response codes etc. in JSON format.  The tool-chain also provides scripts that can plot these into readable charts.
 
 GitLab CI/CD @gitlab-ci is a tool to provide continuous methods of software development, where you continuously build, test, deploy, and monitor iterative code changes.
 
@@ -976,14 +961,15 @@ The Shotgun CI test setup consists of two stages.  The first stage generates the
 
 ==== Logarithmic Percentile Histograms
 
-Bert Hubert and Peter van Dijk @logperfhist have introduced the logarithmic percentile histograms into the DNS world.  In @loghisto, the both axes are logarithmic.  The x-axis show the _slowest_ percentile
+Bert Hubert and Peter van Dijk @logperfhist have introduced the logarithmic percentile histograms into the DNS world.
 
 #figure(
   image("log-histo3-Mar-15-2023-07-57-33-7669-AM.png"),
+  caption: [Example of Logarithmic Percentile Histogram],
 )<loghisto>
 
 
-The $x$-axis describe the slowest percentiles on a logarithmic scale.  As an example, the $1%$ of the slowest queries can be found at $x=1$.  The matching value on the $y$-axis gives as the average latence of the answers for those $1%$ slowest queries – around 8 milliseconds for KPN fiber in the PowerDNS office, and around 90 milliseconds for the Middle East installation.
+In @loghisto, the both axes are logarithmic.  The $x$-axis describe the slowest percentiles on a logarithmic scale.  As an example, the $1%$ of the slowest queries can be found at $x=1$.  The matching value on the $y$-axis gives as the average latence of the answers for those $1%$ slowest queries – around 8 milliseconds for KPN fiber in the PowerDNS office, and around 90 milliseconds for the Middle East installation.
 
 Similarly, the $0.01$ percentile of the queries are answered in around $1200$ milliseconds – and that's barely usable time as many DNS clients will already retry the query.
 
@@ -991,7 +977,7 @@ Looking from a different angle, $99.9%$ of queries ($x=0.01$) are answered under
 
 ==== Custom Root Zone Server
 
-A single instance of Ubuntu server was created in the same AWS region to minimize the effect of the latency on the results and was given a DNS name *nemoto.dns.rocks.*.  A BIND 9.20.8 was installed and configured.  The default configuration was modified to disable recursive DNS queries as this server (`recursion no;`), and maximum EDNS buffer size (e.g. maximum DNS message size over UDP) was bumped to `1452` with `edns-udp-size 1452;` and `max-udp-size 1452`.  Finally, custom root zone was added in a raw (pre-compiled) format.  The final configuration located in standard location `/etc/bind/named.conf` looked like this:
+A single instance of Ubuntu server was created in the same AWS region to minimize the effect of the latency on the results and was given a DNS name *nemoto.dns.rocks.*.  A BIND 9.20.8 was installed and configured on that system.  The default configuration was modified to disable recursive DNS queries as this server (`recursion no;`), and maximum EDNS buffer size (e.g. maximum DNS message size over UDP) was bumped to `1452` with `edns-udp-size 1452;` and `max-udp-size 1452`.  Finally, custom root zone was added in a raw (pre-compiled) format.  The final configuration located in standard location `/etc/bind/named.conf` looked like this:
 
 ```
 options {
@@ -1028,17 +1014,17 @@ BIND 9 development version has been used for benchmarking.  All tested versions 
 
 ==== DNS Resolver Test Data
 
-The Shotgun CI uses a real-world data that were gracefully provided by a large-size telecommunication company and sanitized for privacy reasons – IP addresses were anonymized.  The test set reflects a real unfiltered DNS traffic captured from the networking interface of a large DNS resolver and reflects the traffic generated by Internet Service Provider users, various automated traffic, mis-configurations and miscreants (bots, worms, DDoS clients, etc.), e.g. the usual mix of DNS queries as found on the Internet.
+The Shotgun CI uses a real-world data that were gracefully provided by a large-size telecommunication company and sanitized for privacy reasons – IP addresses were anonymized.  The test set reflects a real unfiltered DNS traffic captured from the networking interface of a large DNS resolver and reflects the traffic generated by Internet Service Provider users, various automated traffic, mis-configurations and wrong-doers (bots, worms, DDoS clients, etc.), e.g. the usual mix of DNS queries as found on the Internet.
 
 === DNS Resolver Benchmarking Results
 
-In addition to the chosen PQC algorithms, the classic algorithms were also tested - RSASHA256 with 2048-bit keys, ECDSA-P256-SHA256 and ED25519.  The RSASHA256-2048 is the current algorithm used to sign the Root Zone, thus the baseline tests from the `ondrej/pqc-main` always tests the RSASHA246-2048 algorithm.
+In addition to the chosen Quantum-Safe algorithms, the traditional DNSSEC algorithms were also tested - RSASHA256 with 2048-bit keys (RSASHA256/2048), ECDSA-P256-SHA256 and ED25519.  The RSASHA256/2048 is the current algorithm used to sign the Root Zone, thus the baseline tests from the `ondrej/pqc-main` always tests the RSASHA246/2048 algorithm.
 
-When evaluating the latency results, it is important to realize that these results were gathered on the real Internet and there will be slight differences between the individual runs and even between the individual branches.
+When evaluating the latency results, it is important to realize that these results were gathered on the real Internet and there are going to be slight differences between the individual runs (intra-run, intra-group) and even between the individual branches (inter-group).
 
 ==== RSASHA256 with 2048-bit keys Results
 
-In @rsasha256-all-groups-latency-since_0-until_300, the results for a situation when the DNS cache is completely empty (also called Cold Cache) can be observed.  As the cache fills up with the data, the latency gradually improves (smaller is better), and effect of DNS cache (Hot Cache) can be observed in @rsasha256-all-groups-latency-since_300-until_600.  The differences between the normal Root Zone servers and the mock Root Zone server for benchmarking can be observed in this scenario, as the DNSSEC algorithm for both tested branches is the same.
+In @rsasha256-all-groups-latency-since_0-until_300, the results for a situation when the DNS cache is completely empty (also called Cold Cache) can be observed.  As the cache fills up with the data, the latency gradually improves (smaller is better), and effect of DNS cache (Hot Cache) can be observed in @rsasha256-all-groups-latency-since_300-until_600.  The should be no differences between the normal Root Zone servers and the mock Root Zone server observed in this scenario, as the DNSSEC algorithm for both tested branches is the same.
 
 #figure(
   caption: [RSASHA256/2048 Latencies],
@@ -1085,7 +1071,7 @@ The results in @rsasha256-all-groups-latency-since_0-until_300 and @rsasha256-al
   ),
 )
 
-There are also no differences between the tested branches in the CPU usage in @rsasha256-all-groups-resmon.cpu.usage_percent and also no difference in memory usage as observed in @rsasha256-all-groups-resmon.memory.
+There are also no differences between the tested branches in the CPU usage in @rsasha256-all-groups-resmon.cpu.usage_percent and also no differences in memory usage as observed in @rsasha256-all-groups-resmon.memory.
 
 Overall, it can be concluded that the benchmarking methodology and the setup is not a source of a difference on its own.
 
@@ -1193,7 +1179,7 @@ Nor there are any differences in the memory and the CPU usage.
 
 ==== FALCON-512 results
 
-Falcon-512 is the first Quantum-Safe algorithm in the test set that has been already standardized by NIST.  Most of the DNS responses except the delegation queries exceed the configured sizes for the DNS messages and therefore most of the communication between the DNS resolver and mock Root Zone server is two-step - first a DNS query is made over UDP, then the DNS message with Truncated bit is returned and the DNS resolver has to make a second DNS query over TCP.
+Falcon-512 is the first Quantum-Safe algorithm in the test set that and only one that has been already standardized by NIST.  Most of the DNS responses except the delegation queries exceed the configured sizes for the DNS messages (EDNS(0) buffer size) and therefore most of the communication between the DNS resolver and mock Root Zone server has to be concluded in two step - first a DNS query is made over UDP, then the DNS message with Truncated bit is returned and the DNS resolver has to make a second DNS query over TCP.
 
 #figure(
   caption: [FALCON-512 Latencies],
@@ -1226,7 +1212,7 @@ In the Cold Cache scenario (@falcon512-all-groups-latency-since_0-until_300), a 
 The differences in the Hot Cache scenario (@falcon512-all-groups-latency-since_300-until_600) also show significant drop in the response latencies.  The percentage of DNS responses received under 1 millisecond drops from $5% - 6%$ range to $10% - 20%$ range.  However, the difference is smoothed out and the overall percentage of DNS queries not responded under 2 seconds shows no difference.
 
 #figure(
-  caption: [Falcon-512 Memory and CPU Usage],
+  caption: [FALCON-512 Memory and CPU Usage],
   numbering: none,
   grid(
     columns: (auto, auto),
@@ -1248,10 +1234,10 @@ The FALCON-512 memory usage (@falcon512-all-groups-resmon.memory) shows some flu
 
 ==== HAWK-256 results
 
-The Hawk-256 algorithm is a Quantum-Safe algorithm that has the most favorable properties for the use in DNSSEC.  All the evaluated DNS messages generated by the authoritative DNS server are smaller than than the configure EDNS(0) DNS message size ($1452$), and the algorithm speed even outperforms not only all the other chosen Quantum-Safe algorithms, but also outperforms all the classic cryptography algorithms used in DNSSEC.
+The HAWK-256 algorithm is a Quantum-Safe algorithm that has the most favorable properties for the use in DNSSEC.  All the evaluated DNS messages generated by the authoritative DNS server are smaller than than the configure EDNS(0) DNS message size ($1452$), and the algorithm speed even outperforms not only all the other chosen Quantum-Safe algorithms, but also outperforms all the classic cryptography algorithms used in DNSSEC.
 
 #figure(
-  caption: [Hawk-256 Latencies],
+  caption: [HAWK-256 Latencies],
   numbering: none,
   grid(
     columns: (auto, auto),
@@ -1276,10 +1262,10 @@ The Hawk-256 algorithm is a Quantum-Safe algorithm that has the most favorable p
   )
 )
 
-And Hawk-256 didn't fail the expectations.  The performance in the Cold Cache (@hawk256-all-groups-latency-since_0-until_300) and Hot Cache (@hawk256-all-groups-latency-since_300-until_600) scenarios is similar to the baseline and the differences can be attributed to the intra-group variations between the runs.
+And HAWK-256 didn't fail the expectations in the benchmarking.  The performance in the Cold Cache (@hawk256-all-groups-latency-since_0-until_300) and Hot Cache (@hawk256-all-groups-latency-since_300-until_600) scenarios is similar to the baseline and the differences can be attributed to the intra-group variations between the runs.
 
 #figure(
-  caption: [Hawk-256 Memory and CPU Usage],
+  caption: [HAWK-256 Memory and CPU Usage],
   numbering: none,
   grid(
     columns: (auto, auto),
@@ -1297,12 +1283,12 @@ And Hawk-256 didn't fail the expectations.  The performance in the Cold Cache (@
 
 There's also no difference in the CPU usage (@hawk256-all-groups-resmon.cpu.usage_percent) and there seems to be slight decrease in the memory usage (@hawk256-all-groups-resmon.memory), but there's not enough supporting evidence to say whether the difference is really significant.  Practically speaking, even though there might be a slight decrease in the memory use, such small change is not going to make any practical difference for the DNS operations.
 
-==== Hawk-512 Results
+==== HAWK-512 Results
 
-The Hawk-512 algorithm is a second tested algorithm from the Hawk family.  Hawk-512 is being submitted as the NIST Level I algorithm (as opposed to Hawk-256 that was submitted in the "Break me if you can" category), but that comes at the cost of increased signature sizes.  The Hawk-512 algorithm still outperforms RSA256/2048 in the signing speed and also outperforms EC-based algorithms (ECDSA-P256-SHA256 and Ed25519) in the verification speed.
+The HAWK-512 algorithm is a second tested algorithm from the Hawk family.  HAWK-512 is being submitted as the NIST Level I algorithm (as opposed to Hawk-256 that was submitted in the "Break me if you can" category), but that comes at the cost of increased signature sizes.  The HAWK-512 algorithm still outperforms RSA256/2048 in the signing speed and also outperforms EC-based algorithms (ECDSA-P256-SHA256 and Ed25519) in the verification speed.
 
 #figure(
-  caption: [Hawk-512 Latencies],
+  caption: [HAWK-512 Latencies],
   numbering: none,
   grid(
     columns: (auto, auto),
@@ -1327,10 +1313,10 @@ The Hawk-512 algorithm is a second tested algorithm from the Hawk family.  Hawk-
   )
 )
 
-The Hawk-512 branch shows a small difference both in the Cold Cache (@hawk512-all-groups-latency-since_0-until_300) and Hot Cache (@hawk512-all-groups-latency-since_300-until_600) scenarios, but again the differences can be attributed to intra-group variations (@hawk512-all-latency-since_0-until_300 and @hawk512-all-latency-since_300-until_600).
+The HAWK-512 branch shows a small difference both in the Cold Cache (@hawk512-all-groups-latency-since_0-until_300) and Hot Cache (@hawk512-all-groups-latency-since_300-until_600) scenarios, but again the differences can be attributed to intra-group variations (@hawk512-all-latency-since_0-until_300 and @hawk512-all-latency-since_300-until_600).
 
 #figure(
-  caption: [Hawk-512 Memory and CPU Usage],
+  caption: [HAWK-512 Memory and CPU Usage],
   numbering: none,
   grid(
     columns: (auto, auto),
@@ -1348,9 +1334,9 @@ The Hawk-512 branch shows a small difference both in the Cold Cache (@hawk512-al
 
 As for the CPU and memory usage, there are no observable differences in the @hawk512-all-groups-resmon.cpu.usage_percent and @hawk512-all-groups-resmon.memory.
 
-==== SQISign-I results
+==== SQIsign-I results
 
-The SQISign algorithm with NIST Level I parameters has been tested.  The SQISign-I public key has very favorable size - the algorithm outperforms RSA256/2048 and has DNS messages sizes in the similar ballpark as EC-based algorithms.  It is also one of the two tested Quantum-Safe algorithms that is not based on the lattices.  Unfortunately, the signing and verification speeds are one magnitude slower than Falcon-512 and two magnitudes slower than EC-based algorithms and the algorithms in the Hawk family.
+The SQIsign-I algorithm with NIST Level I parameters has been tested.  The SQIsign-I public key has very favorable size - the algorithm outperforms RSA256/2048 and has DNS messages sizes in the similar ballpark as EC-based algorithms.  It is also one of the two tested Quantum-Safe algorithms that is not based on the lattices.  Unfortunately, the signing and verification speeds are one magnitude slower than Falcon-512 and two magnitudes slower than EC-based algorithms and the algorithms in the Hawk family.
 
 #figure(
   caption: [SQIsign-I Latencies],
@@ -1378,9 +1364,9 @@ The SQISign algorithm with NIST Level I parameters has been tested.  The SQISign
   )
 )
 
-As expected, there are difference between the baseline and SQISign-I latencies.  In the Cold Cache (@sqisign-all-groups-latency-since_0-until_300) scenario, the percentage of the DNS queries with matching DNS answer under $1$ millisecond drop from the $10% - 20%$ range to sharp $20%$ range, and the percentage of the DNS queries that received answer under 2 seconds drops from the $1% - 2%$ range to close to $3%$ range.  That's close to $2000$ DNS queries that the DNS resolver was not able to successfully provide an answer in time for DNS client to not time-out and retry.
+As expected, there are difference between the baseline and SQIsign-I latencies.  In the Cold Cache (@sqisign-all-groups-latency-since_0-until_300) scenario, the percentage of the DNS queries with matching DNS answer under $1$ millisecond drop from the $10% - 20%$ range to sharp $20%$ range, and the percentage of the DNS queries that received answer under 2 seconds drops from the $1% - 2%$ range to close to $3%$ range.  That's close to $2000$ DNS queries that the DNS resolver was not able to successfully provide an answer in time for DNS client to not time-out and retry.
 
-The Hot Cache (@sqisign-all-groups-latency-since_300-until_600) scenario also shows a significant drop in the percentage of the answered DNS queries.  There is $0.5%$ drop in the number of the DNS queries answered under $1$ millisecond, and there's $0.2%$ difference between the baseline and SQISign-I latencies for answered DNS queries under 2 seconds.
+The Hot Cache (@sqisign-all-groups-latency-since_300-until_600) scenario also shows a significant drop in the percentage of the answered DNS queries.  There is $0.5%$ drop in the number of the DNS queries answered under $1$ millisecond, and there's $0.2%$ difference between the baseline and SQIsign-I latencies for answered DNS queries under 2 seconds.
 
 #figure(
   caption: [SQIsign-I Memory and CPU Usage],
@@ -1454,12 +1440,12 @@ The the Cold Cache (@mayo-all-groups-latency-since_0-until_300) and Hot Cache (@
 
 There are also no difference for MAYO-I CPU and memory usage.
 
-==== Antrag-512 results
+==== ANTRAG-512 results
 
-The Antrag-512 algorithm is based on Falcon-512 and the algorithm's authors focused on making the signatures smaller than those Falcon-512's.  The signing and verification speeds are similar to Falcon-512 making the Antrag-512 suitable for DNSSEC use.  The public key size is larger that MAYO public key size.  Similarly to MAYO, only DNS messages for DNSKEY RR type and non-existence proofs (NSECs) are truncated over UDP and has to be retried by using DNS over TCP.
+The ANTRAG-512 algorithm is based on FALCON-512 and the algorithm's authors focused on making the signatures smaller than those FALCON-512's.  The signing and verification speeds are similar to FALCON-512 making the ANTRAG-512 suitable for DNSSEC use.  The public key size is larger that MAYO public key size.  Similarly to MAYO, only DNS messages for DNSKEY RR type and non-existence proofs (NSECs) are truncated over UDP and has to be retried by using DNS over TCP.
 
 #figure(
-  caption: [Antrag-512 Latencies],
+  caption: [ANTRAG-512 Latencies],
   numbering: none,
   grid(
     columns: (auto, auto),
@@ -1487,7 +1473,7 @@ The Antrag-512 algorithm is based on Falcon-512 and the algorithm's authors focu
 In @antrag-all-groups-latency-since_0-until_300 and @antrag-all-groups-latency-since_300-until_600, there are no differences between baseline and Antrag-512 latencies that can't be attributed to inter-group and inter-run differences.
 
 #figure(
-  caption: [Antrag-512 Memory and CPU Usage],
+  caption: [ANTRAG-512 Memory and CPU Usage],
   numbering: none,
   grid(
     columns: (auto, auto),
@@ -1503,7 +1489,7 @@ In @antrag-all-groups-latency-since_0-until_300 and @antrag-all-groups-latency-s
   ),
 )
 
-Antrag-512 also doesn't cause any visible differences in the CPU usage (@antrag-all-groups-resmon.cpu.usage_percent) and memory usage (@antrag-all-groups-resmon.memory).
+ANTRAG-512 also doesn't cause any visible differences in the CPU usage (@antrag-all-groups-resmon.cpu.usage_percent) and memory usage (@antrag-all-groups-resmon.memory).
 
 = Discussion
 
@@ -1511,9 +1497,9 @@ Antrag-512 also doesn't cause any visible differences in the CPU usage (@antrag-
 
 The offline and online results shows several area that are important for the deployment of the new Digital Signature Schema algorithms for DNSSEC.
 
-The first area is the public key size.  There were three algorithms that cause the DNS answer with DNSSEC-signed DNSKEY RR types to exceed the configured EDNS(0) buffer size has been tested - Falcon-512, MAYO-I and Antrag-512.  There's a significant difference between the Falcon-512 and the other two algorithms - MAYO-I and Antrag-512 that can be contributed to the large Falcon-512 signature size.  The MAYO-I and Antrag-512 results suggest that the algorithm's public key size that is reflected in the DNSKEY Resource Records sizes doesn't make any noticeable difference for the DNS resolver performance in the tested environment.
+The first area is the public key size.  There were three algorithms that cause the DNS answer with DNSSEC-signed DNSKEY RR types to exceed the configured EDNS(0) buffer size has been tested - FALCON-512, MAYO-I and ANTRAG-512.  There's a significant difference between the Falcon-512 and the other two algorithms - MAYO-I and ANTRAG-512 that can be contributed to the large FALCON-512 signature size.  The MAYO-I and ANTRAG-512 results suggest that the algorithm's public key size that is reflected in the DNSKEY Resource Records sizes doesn't make any noticeable difference for the DNS resolver performance in the tested environment.
 
-The second focus area is the signature sizes.  There was a single algorithm - Falcon-512 - that caused the DNS messages (except for the delegation answers) to go over configured EDNS(0) buffer size.  The performance results suggest that the signature sizes are one of the key factors that cause the drop in the DNS resolver performance and increased latencies in the DNS communication.
+The second focus area is the signature sizes.  There was a single algorithm - FALCON-512 - that caused the DNS messages (except for the delegation answers) to go over configured EDNS(0) buffer size.  The performance results suggest that the signature sizes are one of the key factors that cause the drop in the DNS resolver performance and increased latencies in the DNS communication.
 
 The third studied area was the verification speed.  Most of the tested Quantum-Safe algorithms are in the similar magnitude as the existing DNSSEC algorithms with the most notable exception of SQIsign family of algorithms and the tested SQIsign with NIST Level I parameters.  The results show a measurable drop in the performance.  However, when evaluating the results, two things must be considered - a) the charts showing the differences are logarithmical and thus any difference is visually exaggerated, b) a reasonable drop in performance can be a solid compromised for an increased security in the DNS ecosystem.
 
@@ -1521,7 +1507,7 @@ The last area that's less significant for a DNS resolver operation, but can't be
 
 == Challenges and Limitations
 
-This study has been limited to only a handful Quantum-Safe algorithms, and only Falcon-512 has been standardized by NIST so far.  Additionally, even the Falcon family of the algorithms hasn't been fully scrutinized by the cryptographic community and there are recent cryptanalysis papers (@cryptoeprint:2023-224, @springer-10-1007-978-3-031-91820-9_8) that study the side-channels attacks on Falcon-512.  The world of Quantum-Safe algorithms is quickly evolving and the standardization of any new algorithm for DNSSEC must not be rushed.  This is applicable to Falcon-512 but also to the all the other tested algorithms that had only be accepted to the Round 2 of the NIST Additional Digital Signature Schema competition.  In the case of Antrag-512, the algorithm hasn't even been in this challenge and has been presented only handful of times during cryptology conferences.
+This study has been limited to only a handful Quantum-Safe algorithms, and only Falcon-512 has been standardized by NIST so far.  Additionally, even the Falcon family of the algorithms hasn't been fully scrutinized by the cryptographic community and there are recent cryptanalysis papers (@cryptoeprint:2023-224, @springer-10-1007-978-3-031-91820-9_8) that study the side-channels attacks on Falcon-512.  The world of Quantum-Safe algorithms is quickly evolving and the standardization of any new algorithm for DNSSEC must not be rushed.  This is applicable to FALCON-512 but also to the all the other tested algorithms that had only be accepted to the Round 2 of the NIST Additional Digital Signature Schema competition.  In the case of Antrag-512, the algorithm hasn't even been in this challenge and has been presented only handful of times during cryptology conferences.
 
 Furthermore, this study focused only on the normal (real-world) DNS traffic patterns.  However, the attackers are not limited by the normal DNS traffic pattern.  One of the serious challenges even for the normal DNS operations is the pseudo-random sub-domain (PRSD) attack on the DNS resolver.  The attacker creates pseudo-random DNS labels that are used as prefixes for the domain under the attack and the DNS resolver is forced to make outgoing queries for each PRSD query that the attacker makes.  There are mitigation techniques for the PRSD attack for DNSSEC-signed domains - more on that in the @recommendations.  The future study should focus on the malicious traffic patterns and study the effects on the DNS Resolver performance where the ratio between the existing domain name and non-existing domain names would vary.
 
@@ -1549,7 +1535,7 @@ As the pseudo-random sub-domain attack mainly uses the domain names that don't e
 
 === Different levels of DNS hierarchy
 
-This study only focused on the Root Zone level of the DNS hierarchy.  ICANN's Centralized Zone Data Service (CZDS) is an online portal where any interested party can request access to the Zone Files provided by participating generic Top-Level Domains (gTLDs) @czds.  This service can be used to download many TLD zone files that can be re-signed with Quantum-Safe algorithms and more thorough mock setup of the DNS hierarchy can be created.  Notably large zones like .com, .net, or .org can be downloaded from the service.  Additionally, there are some ccTLDs (country-code TLDs) that provide access to their zone files like IIS @iis-zonedata for .se and .nu.  Using a mixed setup will also allow testing the environment that would mimic the gradual deployment of the Quantum-Safe algorithms at various points of the DNS hierarchy.
+This study only focused on the Root Zone level of the DNS hierarchy.  ICANN's Centralized Zone Data Service (CZDS) is an online portal found at https://czds.icann.org/home where any interested party can request access to the Zone Files provided by participating generic Top-Level Domains (gTLDs) @czds.  This service can be used to download many TLD zone files that can be re-signed with Quantum-Safe algorithms and more thorough mock setup of the DNS hierarchy can be created.  Notably large zones like .com, .net, or .org can be downloaded from the service.  Additionally, there are some ccTLDs (country-code TLDs) that provide access to their zone files like IIS @iis-zonedata for .se and .nu.  Using a mixed setup will also allow testing the environment that would mimic the gradual deployment of the Quantum-Safe algorithms at various points of the DNS hierarchy.
 
 === Test more algorithms
 
@@ -1559,6 +1545,10 @@ Since the public key sizes didn't affect the DNS Resolver performance in this pa
 
 This study focused on the real-world, relatively normal, DNS traffic.  The future study can focus on scenarios where the attacker abuse the DNS for attacking other services (reflection Distributed Denial of Service attack) or use the algorithm properties to attack the DNS itself.  Even though the public key sizes were not a factor in this study, it should be studied how the public key and signature sizes affect the DNS Resolver performance in the case of malign authoritative name-server.  Scenarios might include very short or zero TTL values, short signature times and constantly changing Signing Keys (Zone Signing Keys) that force the DNS Resolver to repeatedly to re-query the contents of the zone under attacker's control.
 
+=== Modification of existing algorithm
+
+Prof. Ronen suggested @ronen2024 that if being stateless is very important, SPHINCS+ variant that can support a maximum of 2^16 signatures instead of 2^64 can be considered, such change will result in a much smaller signature.
+
 = Conclusion
 
 == Summary of Findings
@@ -1567,7 +1557,7 @@ This study evaluated the feasibility of integrating the new Post-Quantum Cryptog
 
 === Public Key Size
 
-The Public Key size is a critical factor for DNSSEC operations.  This study has shown that under the normal circumstances there is no difference between the algorithms that fit the DNS queries for DNSKEY records into the UDP messages and those that have to fall-back to TCP to get the full contents of the DNSKEY Resource Records with the respective signatures.  Further research is needed in this area to verify the findings in the case of an attack on the DNS infrastructure or misconfiguration.
+The Public Key size is a critical factor for DNSSEC operations.  This study has shown that under the normal circumstances there is no difference between the algorithms that fit the DNS queries for DNSKEY records into the UDP messages and those that have to fall-back to TCP to get the full contents of the DNSKEY Resource Records with the respective signatures.  Further research is needed in this area to verify the findings in the case of an attack on the DNS infrastructure or mis-configuration.
 
 === Signature Size
 
@@ -1575,11 +1565,11 @@ Another crucial factor for DNSSEC is a signature size.  Larger signatures can le
 
 === Signing and Verification Speeds
 
-The speed of signing and verification processes is essential for the efficient operation of DNS and DNSSEC. The study found that while some PQC algorithms, such as Hawk-256 and Hawk-512, offer signing and verification speeds comparable to or better than traditional algorithms like RSA and ECDSA, others like SQISign-I exhibit significantly slower performance. This can be a limiting factor for DNS resolver operators, but also for authoritative DNS server operators and signer, especially for large zones or DNS operators with large number of signed zones.
+The speed of signing and verification processes is essential for the efficient operation of DNS and DNSSEC. The study found that while some PQC algorithms, such as HAWK-256 and HAWK-512, offer signing and verification speeds comparable to or better than traditional algorithms like RSA and ECDSA, others like SQIsign-I exhibit significantly slower performance. This can be a limiting factor for DNS resolver operators, but also for authoritative DNS server operators and signer, especially for large zones or DNS operators with large number of signed zones.
 
 === Performance Impact
 
-The performance impact of integrating PQC algorithms into DNSSEC was evaluated through extensive benchmarking. The study results showed that while some algorithms like Hawk-256 and Hawk-512 have minimal impact on the DNS Resolver performance, others like Falcon-512 and SQISign-I introduce noticeable latency and computational overhead. This highlights the need for careful selection and optimization of Quantum-Safe algorithms for DNSSEC. 
+The performance impact of integrating PQC algorithms into DNSSEC was evaluated through extensive benchmarking. The study results showed that while some algorithms like HAWK-256 and HAWK-512 have minimal impact on the DNS Resolver performance, others like FALCON-512 and SQIsign-I introduce noticeable latency and computational overhead. This highlights the need for careful selection and optimization of Quantum-Safe algorithms for DNSSEC. 
 
 == Contributions to the Field
 
@@ -1942,14 +1932,3 @@ The research provides new insights about the practicality and obstacles of imple
     ),
     caption: [FAEST key and signature sizes in bytes for each security level],
   ) <faest-sizes>
-
-Data 20x:
-  - SQISign:    https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5577905
-  - HAWK-256:   https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5577915
-  - HAWK-512:   https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5577934
-  - MAYO:       https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5577952
-  - ANTRAG:     https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5577983
-  - FALCON-512: https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5577697
-  - RSA2048:    https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5602029
-  - ECDSAP256:  https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5578064
-  - ED25519:    https://gitlab.isc.org/isc-projects/bind9-shotgun-ci/-/jobs/5578250
