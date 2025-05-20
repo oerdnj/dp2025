@@ -545,6 +545,10 @@ Fregly et al. @fregly-dnsop-slh-dsa-mtl-dnssec-04 proposed how to apply the Stat
 
 Surý @sury-dnsop pointed out that a malicious zone operator can return a different rung for every query which effectively makes the resolver request a new signed ladder every time it makes a remote DNS request.  This removes any benefit that the resolvers gain from using the Merkle Tree Ladder mode.  A resistance against the repeated key re-fetching needs to be built into the protocol, and putting limits on frequency is not going to be enough.
 
+=== Summary of the related work
+
+As the postquantum cryptography and the proposed and tested algorithms are all relatively new and fresh, much research is still needed how to retrofit the newly proposed quantum-safe algorithms into DNSSEC.  One of the proposed methods is to add out-of-band key distribution mechanism that would allow algorithms with large public keys, small signatures and fast verification speeds to be used.  Other methods are also focused on making the signatures smaller.  The XMSS might be a good backup candidate, but that requires that number of signatures for a specific zone is known, and the signer has to be stateful.  This will have a relatively small signature size and fast verification @ronen2024.  Finally, using the Merkle Tree Ladder (MTL) Mode also focuses on making the individual signatures smaller, but that would require solving the problem with rogue zone operators using n:n full signatures.  However, the beauty of MTL mode is that it can be used with the existing NIST-approved digital signature schemes, which might be a requirement for US governmental agencies.
+
 = Methodology
 
 == Research Design
@@ -1544,6 +1548,8 @@ In this test,only the Root Zone was signed with the tested Quantum-Safe algorith
 
 5. Ask NIST for guidance: The current PQC challenges run by NIST mostly focuses on the algorithms that have properties needed for long-term archival and protection.  The DNSSEC needs are little bit different - there signatures are changed often, there's a possibility of automated key exchange.  It is recommended that the DNS community speaks with the cryptographers community and highlights the DNSSEC needs and ask the cryptographic community for a guidance.
 
+6. Wait and see: As the DNSSEC public keys and signatures requires verification in the "current" time, there is actually little rush needed.  There is no need for signatures that has been validated today to be also validated in the 20-years time.  Same applies to the public and secret keys - if the algorithms being used nowadays is going to be broken in 10-years, 20-years time, there will be absolutely no damage by revealing the secret keys to the general public.  The DNSSEC signatures have inception and expiration time which is generally limited to week or days, and as soon as all the DNSSEC signatures have expired and the previously used DNSSEC key is now longer in use, it can be made public even now.  There will be no harm because the key is no longer in use.
+
 == Future Work
 
 As already outlined in this section, there are several areas for the future work.
@@ -1951,6 +1957,8 @@ The research provides new insights about the practicality and obstacles of imple
     ),
     caption: [FAEST key and signature sizes in bytes for each security level],
   ) <faest-sizes>
+
+#pagebreak()
 
 == Data and implementation sources
 
