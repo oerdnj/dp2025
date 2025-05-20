@@ -155,6 +155,11 @@ In simplest terms, DNS is a translator; it converts domain names, such as _examp
 
 The Domain Name System is a hierarchical structure with the root domain (_._) at the top, then the Top Level Domains (TLDs), the generic TLDs (gTLDs) such as _.com_, _.org_, the country code TLDs (ccTLDs) such as _.uk_ or _.cz_, sponsored TLDs (sTLDs) for particular purposes like _.cat_ (not the animals, but the top-level domain for the Catalan linguistic and cultural community), _.edu_ (for Institutions of higher learning in the US) or _.aero_ (for members of the air transport industry), and in the ICANN era, the newTLDs or the new top-level domains for people who have enough money to spare. This hierarchical structure helps in the assignment of different parts of the DNS tree to different entities thereby enhancing the control of administration while at the same time enhancing the connectivity of the system. For instance, while ICANN has the responsibility of the root zone, other organizations can manage their domains independently within the system, which makes the system very flexible, resilient, robust, and easy to administer.
 
+#figure(
+  image("DNS-hierarchy.svg"),
+  caption: [DNS Hierarchy],
+)
+
 The hierarchical and distributed nature of DNS has several consequences in several areas as shown below; The distribution of authority also has a tendency of eliminating single points of failure as each zone cane handled by several servers. The second is the caching system at different levels of the DNS which reduces the burden of the network and increases the rate of response to queries by storing frequently sought after records closer to the user. The third is the delegation model, which helps in management of regions while at the same time providing a clear chain of authority from the root servers, all the way to the individual domain records, globally.
 
 The DNS architecture is composed of the following elements that work together to deliver efficient name resolution services:
@@ -199,7 +204,12 @@ These security mechanisms effectively address several critical vulnerabilities t
  - DNSSEC sets up a chain of trust which extends from configured trust anchors (usually the DNS root) all the way to specific domain records
  - Each cryptographic layer in the hierarchy directly links to the preceding layer
  - Trust anchors including the root zone KSK enable the validation process to start from a known position
- 
+
+#figure(
+  image("DNSSEC Trust Chain.svg"),
+  caption: [DNSSEC Trust Chain],
+)<dnssec-trust-chain>
+
 The implementation of DNSSEC extends beyond basic DNS security, playing a crucial role in broader Internet security frameworks:
  
 1. DANE (DNS-based Authentication of Named Entities) @rfc7671:
@@ -541,7 +551,7 @@ Surý @sury-dnsop pointed out that a malicious zone operator can return a differ
 
 For the purpose of this study, the selected Quantum-Safe algorithms will be implemented in the BIND 9 open-source DNS server.  BIND 9 @bind9-arm is a complete implementation of the DNS protocol. BIND 9 can be configured (using its `named.conf` file) as an authoritative name server, a resolver, and, on supported hosts, a stub resolver. While large operators usually dedicate DNS servers to a single function per system, smaller operators will find that BIND 9’s flexible configuration features support multiple functions, such as a single DNS server acting as both an authoritative name server and a resolver.
 
-The implementation of each post-quantum algorithm will then be used to test various phases of DNSSEC deployment.  In all phases, the current DNSSEC algorithms will be tested along with the selected post-quantum algorithms for a comparison.  Specifically RSASHA256 with 2048-bit keys, ECDSAP256SHA256 and ED25519 algorithms will be used.
+The implementation of each post-quantum algorithm will then be used to test various phases of DNSSEC deployment.  In all phases, the current DNSSEC algorithms will be tested along with the selected post-quantum algorithms for a comparison.  Specifically RSASHA256 with 2048-bit keys, ECDSAP256SHA256 and ED25519 algorithms will be used.  The 2048-bits for RSASHA256 were chosen as this is the current algorithm used for the root zone @ksk-rollover-2016 @ksk-rollover-2019.
 
 === Testing Environment
 
@@ -635,7 +645,7 @@ As with the previous considerations on size, the normal mode of operation is not
 
 It was shown that if the attacker can make the DNS resolver to process many DNSKEYs and many RRSIGs, it can grid the resolver to almost full stop @heftrig2024hardertryharderfail.  At least in BIND 9, the KeyTrap attack was mitigated by limiting the number of DNSKEY-RRSIG pairs and also by offloading the cryptographical operations to a different thread-pool, so it does not interfere with non-DNSSEC traffic and the server function of the DNS server when responding DNS queries for local zones or data already in the cache of the DNS resolver.
 
-The other trap lies again in the field of Authenticated Denial of Existence (NSEC).  An attacker can use a technique called Pseudo-Random Subdomain-Attack (PRSD) to force the DNS resolver to ask the upstream authoritative servers again and again for random subdomains that don't exist and validate the NSEC answer from the authoritative server again and again. The Hashed Authenticated Denial of Existence (NSEC3) records suffer from the exactly same problem, and the same mechanism cane used to mitigate the attack. This cane mitigated by Aggressive Use of DNSSEC-Validated Cache (FIXME: RFC 8198, 9077) - using the already cached Authenticated Denial of Existence records from the DNS resolver cache to validate the existence/non-existence of the queried name to prevent the sending the DNS query to the upstream DNS server in the case we already know that the pseudo-random sub-domain lies within the range covered by the NSEC(3) record.  The implication of this is that for any PQC algorithm slower than the existing algorithms, the Aggressive Use of DNSSEC-Validated Cache must be implemented in any DNS server implementation along with PQC algorithm validation.
+The other trap lies again in the field of Authenticated Denial of Existence (NSEC).  An attacker can use a technique called Pseudo-Random Subdomain-Attack (PRSD) to force the DNS resolver to ask the upstream authoritative servers again and again for random subdomains that don't exist and validate the NSEC answer from the authoritative server again and again. The Hashed Authenticated Denial of Existence (NSEC3) records suffer from the exactly same problem, and the same mechanism cane used to mitigate the attack. This cane mitigated by Aggressive Use of DNSSEC-Validated Cache @rfc8198, @rfc9077 - using the already cached Authenticated Denial of Existence records from the DNS resolver cache to validate the existence/non-existence of the queried name to prevent the sending the DNS query to the upstream DNS server in the case we already know that the pseudo-random sub-domain lies within the range covered by the NSEC(3) record.  The implication of this is that for any PQC algorithm slower than the existing algorithms, the Aggressive Use of DNSSEC-Validated Cache must be implemented in any DNS server implementation along with PQC algorithm validation.
 
 == Suitable algorithms
 
@@ -663,7 +673,7 @@ The last algorithm included in this work hasn't be submitted into the NIST Addit
 
 == Implementation Status
 
-During the implementation of the new cryptographic algorithms, the cryptographic API in the BIND 9 has been cleaned up.  Duplicate functions (`verify`, and `verify2`) have been merged and unused functions (`createctx2`, `computesecret`, `paramcompare`, and `cleanup`) have been removed.  This has been submitted to the upstream project in the `ondrej/dst_api-cleanup` branch.
+During the implementation of the new cryptographic algorithms, the cryptographic API in the BIND 9 has been cleaned up.  Duplicate functions (`verify`, and `verify2`) have been merged and unused functions (`createctx2`, `computesecret`, `paramcompare`, and `cleanup`) have been removed.  This has been submitted to the upstream project in the `ondrej/dst_api-cleanup` branch in the associated merge requests#footnote[https://gitlab.isc.org/isc-projects/bind9/-/merge_requests/10345].
 
 During implementation of the algorithm with larger secret key, public key or signature sizes, it was discovered that additional modifications to the BIND 9 code were needed, specifically sizes of various internal buffers and data structures that hold the secret key, public keys and signatures.
 
@@ -673,11 +683,11 @@ Additionally, the limits of allowed outgoing DNS queries had to be increased bec
 
 As the FALCON algorithm has been already standardized by NIST, multiple implementations exists.  PQclean project @cryptoeprint:2022_337 provides clean, tested and vetted implementation of the FALCON algorithm that can be easily integrated into other projects.  The liboqs library @cryptoeprint:2016_1017 that extends OpenSSL library has also been considered, but for the testing purposes an implementation that can be fully embedded into BIND 9 project was more suitable.
 
-The copy of the FALCON PQclean code has been embedded into BIND 9 project in the `ondrej/pqc-falcon` project.
+The copy of the FALCON PQclean code has been embedded into BIND 9 project in the `ondrej/pqc-falcon` branch#footnote[https://gitlab.isc.org/isc-projects/bind9/-/commits/ondrej/pqc-falcon].
 
 === HAWK
 
-HAWK project provides a neat implementation suitable for direct embedding into other projects that made the testing of the HAWK algorithm very easy and straightforward.  No further modifications of the BIND 9 source code was needed.  The code was embedded directly into the BIND 9 in the `ondrej/pqc-hawk-256` and `ondrej/pqc-hawk-512` branch.
+HAWK project provides a neat implementation suitable for direct embedding into other projects that made the testing of the HAWK algorithm very easy and straightforward.  No further modifications of the BIND 9 source code was needed.  The code was embedded directly into the BIND 9 in the `ondrej/pqc-hawk-256`#footnote[https://gitlab.isc.org/isc-projects/bind9/-/commits/ondrej/pqc-hawk-256] and `ondrej/pqc-hawk-512` branch#footnote[https://gitlab.isc.org/isc-projects/bind9/-/commits/ondrej/pqc-hawk-512].
 
 === SQISign
 
@@ -685,7 +695,7 @@ The official implementation of the SQIsign algorithm has been updated for the Ro
 
 The implementation also currently doesn't produce public header files.  There are three files in the `./include` directory: `mem.h`, `rng.h` and `sig.h`.  The build system has been modified for the purposes of this work to install these files to `sqisign/{mem,rng,sig}.h`, but generally speaking the `rng.h` header exports two functions called `randombytes_init()` and `randombytes()` that are not really suitable to be used in the common name-space.  Those functions should be moved under the `sqisign_` prefixed name-space.
 
-The integration of the SQIsign algorithm has been published in the `ondrej/pqc-sqisign` branch of the BIND 9 project.  The shared libraries compiled with the optimizations enabled have been added into the branch for the testing purposes.
+The integration of the SQIsign algorithm has been published in the `ondrej/pqc-sqisign` branch#footnote[https://gitlab.isc.org/isc-projects/bind9/-/commits/ondrej/pqc-sqisign] of the BIND 9 project.  The shared libraries compiled with the optimizations enabled have been added into the branch for the testing purposes.
 
 SQIsign at the NIST Security Level 1 has been tested and marked as SQIsign-I below.
 
@@ -693,13 +703,13 @@ SQIsign at the NIST Security Level 1 has been tested and marked as SQIsign-I bel
 
 The MAYO implementation follows that similar pattern as the SQIsign implementation.  The MAYO team currently focuses on the NIST Additional DSS Round 2 submission and the MAYO implementation uses that same anti-patterns - overly complicated CMake build system, no shared libraries, little to none API documentation.  The same modifications have been done – the build system has been modified to produce the shared libraries and install the headers into appropriate places.
 
-The MAYO algorithm has been integrated into BIND 9 in the `ondrej/pqc-mayo` branch.  The shared libraries compiled with the optimizations enabled have been added into the branch for the testing purposes.
+The MAYO algorithm has been integrated into BIND 9 in the `ondrej/pqc-mayo` branch#footnote[https://gitlab.isc.org/isc-projects/bind9/-/commits/ondrej/pqc-mayo].  The shared libraries compiled with the optimizations enabled have been added into the branch for the testing purposes.
 
 MAYO at the NIST Security Level 1 has been tested and marked as MAYO-I below.
 
 === ANTRAG
 
-The ANTRAG authors provided a implementation in a form of a benchmark.  The implementation is definitely not suitable for integration into other projects, but the integration has been completed for the purposes of this work by integrating the source code of ANTRAG-512 into the BIND 9 source code and embedding the GMP shared library into the source tree.  The result can be found in the `ondrej/pqc-antrag` branch of the BIND 9 source code repository.
+The ANTRAG authors provided a implementation in a form of a benchmark.  The implementation is definitely not suitable for integration into other projects, but the integration has been completed for the purposes of this work by integrating the source code of ANTRAG-512 into the BIND 9 source code and embedding the GMP shared library into the source tree.  The result can be found in the `ondrej/pqc-antrag` branch#footnote[https://gitlab.isc.org/isc-projects/bind9/-/commits/ondrej/pqc-antrag] of the BIND 9 source code repository.
 
 Antrag-512 variant has been tested in this study.
 
@@ -709,7 +719,7 @@ The measurements in this experiment has been conducted on two different platform
 
 === Local testing
 
-The local testing has been conducted on System76 Meerkat machine that features Intel® Core™ Ultra 7 155H processor.  This processor includes 6 performance cores, 8 efficient cores and 2 low power efficient-cores.  The full specification of the processor can be found at https://www.intel.com/content/www/us/en/products/sku/236847/intel-core-ultra-7-processor-155h-24m-cache-up-to-4-80-ghz/specifications.html.
+The local testing has been conducted on System76 Meerkat machine that features Intel® Core™ Ultra 7 155H processor.  This processor includes 6 performance cores, 8 efficient cores and 2 low power efficient-cores #footnote[https://www.intel.com/content/www/us/en/products/sku/236847/intel-core-ultra-7-processor-155h-24m-cache-up-to-4-80-ghz/specifications.html].
 
 To achieve a stability in the benchmarks, the Intel® Turbo Boost and Hyper-Threading have been disabled, and the benchmarking has been pinned to the the 6 performance cores.  The Intel® Turbo Boost has been disabled with `echo 1 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo` command, the Hyper-Threading has been disabled using `echo off | sudo tee /sys/devices/system/cpu/smt/control` command and the performance cores has been selected using the `lscpu --all --extended` utility:
 
@@ -747,7 +757,7 @@ To achieve a stability in the benchmarks, the Intel® Turbo Boost and Hyper-Thre
     caption: [Output of the `lscpu` command after disabling the Intel Turbo-Boost and the Hyper-Threading],
 ) <lscpu>
 
-The testing command has been limited to the selected CPU using the `taskset -c 0,1,3,6,9,10` command, and the hyperfine (https://github.com/sharkdp/hyperfine) – a command-line benchmarking tool that provides statistical analysis - has been used to run the commands several times in a row.
+The testing command has been limited to the selected CPU using the `taskset -c 0,1,3,6,9,10` command, and the hyperfine#footnote[https://github.com/sharkdp/hyperfine] – a command-line benchmarking tool that provides statistical analysis - has been used to run the commands several times in a row.
 
 In the local testing, the key generation times, signing and verification times has been tested using the real DNS zones of various sizes located on the `tmpfs` file system.  The `tmpfs` file system is located in the memory of the operating system, thus it removes the effects of the solid state disk latency.
 
@@ -759,7 +769,7 @@ A mock DNS root zone server has been set up with the copy of the DNS root zone s
 
 - the copy of the root zone has been stripped of the current signatures (RRSIG Resource Records, NSEC Resource Records) and public keys (DNSKEY Resource Records);
 - exactly one Key Signing Key (KSK) and exactly one Zone Signing Key (ZSK) have been added to the zone;
-- and the whole zone has been signed with the `dnssec-signzone` utility.
+- and the whole zone has been signed with the `dnssec-signzone` utility using `-x` argument meaning that only Key Signing Key is being used to sign the *DNSKEY* Resource Records set.
 
 BIND 9 source code on the abovementioned git branches has been modified to use this mock DNS server to measure the effect of the different algorithms on the resolving process, and the each test has been started with configuration change to use the Key Signing Key for each of the tested algorithms.
 
@@ -789,29 +799,38 @@ In the @sizes, summary of Secret Key, Public Key and Signature sizes are given. 
 
 == Signed Zone Size
 
+In @zone-sizes, the sizes of several zone types are listed:
+
+1. Root Zone - this is the current root zone as downloaded from #link("https://www.iana.org/domains/root/db")[IANA]
+2. TLD Zone - this is the ORG Zone file downloaded from Centralized Zone Data Service @czds.  Domain names with only *DS* Resource Records without matching delegation *NS* records were manually removed (11 records in total).
+3. Small Zone - this is the personal RFC1925.ORG zone file
+
+The zone files were stripped of DNSSEC records with `ldns-read-zone -s` command and then converted in the BIND 9 *raw* zone file format to reduce the effect of the variable text-based zone-file formats.  Then for each algorithm except *unsigned* they were signed using the `dnssec-signzone` utility.
+
 #figure(
     table(
-      columns: (auto, 1fr, 1fr, 1fr, 1fr),
+      columns: (auto, 1fr, 1fr, 1fr),
       stroke: (x: none),  
-      table.header([*Algorithm*], [*Root Zone*], [*TLD Zone*], [*Small Zone*], [*Reverse Zone*]),
-      [FALCON-512],				[I],					[$1281$],		[$897$],	[$666$],
-      [HAWK-256],					[Challenge],	[$96$],			[$450$],	[$249$],
-      [HAWK-512],					[I],					[$184$],		[$1024$],	[$555$],
-      [SQIsign-I],				[I],					[$353$],		[$65$],		[$148$],
-      [MAYO-I],						[I],					[$24$],			[$1420$],	[$454$],
-      [ANTRAG-512],				[I],					[$59392$],	[$768$],	[$592$],
-      [RSASHA256-2048],		[n/a],				[$1232$],		[$256$],	[$256$],
-      [ECDSAP256SHA256],	[n/a],				[$32$],			[$64$],		[$64$],
-      [ED25519],					[n/a],				[$32$],			[$32$],		[$64$],
+      table.header([*Algorithm*], [*Root Zone*], [*TLD Zone*], [*Small Zone*]),
+      [unsigned],          [$833920$],	 [$1197487976$],   [$3544$],
+      [FALCON-512],       [$2894051$],	[$11086538426$],  [$73909$],
+      [HAWK-256],				  [$1730144$],	 [$6181022924$],  [$35902$],
+      [HAWK-512],				  [$2584726$],	 [$9780754216$],  [$64284$],
+      [SQIsign-I],			  [$1447685$],	[DNF #footnote[The SQISign-I signing of *ORG.* zone ended up with `Floating point exception (core dumped)` error message and did not finish.]],  [$26143$],
+      [MAYO-I],					  [$2303829$],	 [$8592608784$],  [$56087$],
+      [ANTRAG-512],			  [$2687407$],	[$10216015192$],  [$67065$],
+      [RSASHA256-2048],	  [$1749287$],	 [$6263369312$],  [$36145$],
+      [ECDSAP256SHA256],  [$1213407$], 	 [$4004714712$],  [$18665$],
+      [ED25519],				  [$1213343$],	 [$4004714648$],  [$18601$],
     ),
-    caption: [Secret Key, Public Key and Signature Sizes],
+    caption: [Signed Zones Sizes],
 ) <zone-sizes>
 
 == DNS Response Sizes 
 
 The final DNS messages sizes are provided in @dns-sizes.  All the DNS queries in this section had RD-bit (Recursion Desired) disabled, DO-bit (DNSSEC OK) enabled, and EDNS(0) Buffer Size enlarged to 1452 (`dig +dnssec +norec +bufsize=1452`).
 
-Since the mock Root Zone was signed only with single Key Signing Key and single Zone Signing Key, all the signatures for DNSSEC-signed records contain only single `RRSIG` Resource Record.  In the case when more than single DNSSEC Keys were used, there would be multiple `RRSIG` Resource Records enlarging the DNS responses even more.  The `RRSIG` records contain signature generated with the Zone Signing Key unless specified otherwise.
+Since the mock Root Zone was signed only with single Key Signing Key and single Zone Signing Key, all the signatures for DNSSEC-signed records contain only single `RRSIG` Resource Record.  In the case when more than single DNSSEC Keys were used, there would be multiple `RRSIG` Resource Records enlarging the DNS responses even more.  The `RRSIG` records contain signature generated with the Zone Signing Key unless specified otherwise.  The BIND 9 mock root server was configured to provide minimal responses with `minimal-responses yes;`.
 
 The sizes of DNS responses for the following DNS queries are given:
 
@@ -826,15 +845,15 @@ The sizes of DNS responses for the following DNS queries are given:
       columns: (auto, 1fr, 1fr, 1fr, 1fr, 1fr),
       stroke: (x: none),  
       table.header([*Algorithm*], [*SOA*], [*DNSKEY*], [*NSEC-Name*], [*NSEC-Type*], [*Delegation*]),
-      [FALCON-512],				[$1532^*$],	[$2548^*$],	[$2251^*$],	[$1521^*$],	[$1031$],
-      [HAWK-256],					[$675$],		[$1237$],		[$1004$],		[$688$],		[$614$],
-      [HAWK-512],					[$1310$],		[$2691^*$],	[$1921^*$],	[$1299$],		[$920$],
-      [SQIsign-I],				[$473$],		[$366$],		[$701$],		[$486$],		[$513$],
-      [MAYO-I],						[$1108$],		[$3382^*$],	[$1618^*$], [$1097$],		[$819$],
+      [FALCON-512],				[$797$],	[$2548^*$],	[$1520^*$],	[$1518^*$],	[$1023$],
+      [HAWK-256],					[$380$],		[$1237$],		[$686$],		[$684$],		[$606$],
+      [HAWK-512],					[$686$],		[$2691^*$],	[$1298$],	 [$1296$],		[$912$],
+      [SQIsign-I],				[$279$],		[$366$],		[$484$],		[$482$],		[$505$],
+      [MAYO-I],						[$585$],		[$3382^*$],	[$1096$], [$1094$],		[$811$],
       [ANTRAG-512],				[$1384$],		[$2216^*$],	[$2032^*$],	[$1373$],		[$957$],
-      [RSASHA256-2048],		[$712$],		[$864$],		[$1024$],		[$701$],		[$621$],
-      [ECDSAP256SHA256],	[$328$],		[$280$],		[$448$],		[$317$],		[$429$],
-      [ED25519],					[$328$],		[$216$],		[$448$],		[$317$],		[$429$],
+      [RSASHA256-2048],		[$712$],		[$864$],		[$700$],		[$698$],		[$613$],
+      [ECDSAP256SHA256],	[$195$],		[$280$],		[$316$],		[$314$],		[$421$],
+      [ED25519],					[$195$],		[$216$],		[$316$],		[$314$],		[$421$],
     ),
     caption: [DNS Response Sizes ($""^*$ - Truncated, retried in TCP mode.)],
 ) <dns-sizes>
@@ -957,7 +976,7 @@ In this experimental setup, the following variables has been altered from their 
 - `SHOTGUN_DURATION` was set to 600 seconds, e.g. 5 minutes.  This allows enough time to fill the cache and test both cold cache and hot cache scenarios with sufficient time and queries.
 - `BIND_EXTRA_CONF` was used to setup custom DNSSEC trust anchors.  The custom trust anchors contain both the current DNSSEC root zone key signing keys (KSK) and a new custom root zone key signing key for each of the tested algorithms.
 
-The Shotgun CI test setup consists of two stages.  The first stage generates the Continuous Integration (CI) configuration based on the given variables, and the second stage spins up enough machines (FIXME: Specification?) in the Amazon AWS Cloud and distributes the individual test runs to each AWS node.  When all the benchmarking runs are finished, a post-processing job collects all the logs from all the benchmarking runs and combines them into single output.  It generates number of charts and also provides a simplified basic view that contains aggregated performance charts (first half of the interval, second half of the interval and the whole interval), memory consumption, CPU load during the benchmark, and performance chart with all benchmarking runs plotted separately.  More charts can be generated based on the data gathered during the benchmarking runs, but for our purposes, these are enough to consider the impact of the PQC algorithms on the DNS Resolver Performance.
+The Shotgun CI test setup consists of two stages.  The first stage generates the Continuous Integration (CI) configuration based on the given variables, and the second stage spins up enough machines in the Amazon AWS Cloud and distributes the individual test runs to each AWS node.  When all the benchmarking runs are finished, a post-processing job collects all the logs from all the benchmarking runs and combines them into single output.  It generates number of charts and also provides a simplified basic view that contains aggregated performance charts (first half of the interval, second half of the interval and the whole interval), memory consumption, CPU load during the benchmark, and performance chart with all benchmarking runs plotted separately.  More charts can be generated based on the data gathered during the benchmarking runs, but for our purposes, these are enough to consider the impact of the PQC algorithms on the DNS Resolver Performance.
 
 ==== Logarithmic Percentile Histograms
 
@@ -1010,7 +1029,7 @@ For every tested algorithm, following steps were done:
 
 ==== DNS Resolver Configuration
 
-BIND 9 development version has been used for benchmarking.  All tested versions including the baseline versions have been modified to bump the `max-recursion-queries` from $50$ to $100$ and maximum EDNS(0) UDP size has been changed from $1232$ to $1452$ as some algorithms that would cause fallback from UDP to TCP could go over these configured limits and cause DNS resolution failures unrelated to the cryptographic operations.  The baseline version can be found in the `ondrej/pqc-main` branch in the upstream BIND 9 repository.  All tested BIND 9 versions (except the baseline version) have a common ancestor branch `ondrej/pqc-base` that contains changes from the `ondrej/pqc-main`, but also modifies the nameservers for the root zone from the original *[a-m].root-servers.net.* to *nemoto.dns.rocks.* with a single IPv4 address and a single IPv6 address.
+BIND 9 development version has been used for benchmarking.  All tested versions including the baseline versions have been modified to bump the `max-recursion-queries` from $50$ to $100$ and maximum EDNS(0) UDP size has been changed from $1232$ to $1452$ as some algorithms that would cause fallback from UDP to TCP could go over these configured limits and cause DNS resolution failures unrelated to the cryptographic operations.  The baseline version can be found in the `ondrej/pqc-main` branch#footnote[https://gitlab.isc.org/isc-projects/bind9/-/commits/ondrej/pqc-main] in the upstream BIND 9 repository.  All tested BIND 9 versions (except the baseline version) have a common ancestor branch `ondrej/pqc-base`#footnote[https://gitlab.isc.org/isc-projects/bind9/-/commits/ondrej/pqc-base] that contains changes from the `ondrej/pqc-main`, but also modifies the nameservers for the root zone from the original *[a-m].root-servers.net.* to *nemoto.dns.rocks.* with a single IPv4 address and a single IPv6 address.
 
 ==== DNS Resolver Test Data
 
@@ -1932,3 +1951,9 @@ The research provides new insights about the practicality and obstacles of imple
     ),
     caption: [FAEST key and signature sizes in bytes for each security level],
   ) <faest-sizes>
+
+== Data and implementation sources
+
+All sources for the thesis, text in the Typst#footnote[https://typst.app/docs] format, all the images and all the raw data from the measurement can be found in the GitHub repository called `oerdnj/dp2025`#footnote[https://github.com/oerdnj/dp2025/settings].  The repository is structured to have all the measurements including the charts in the subdirectories named after the algorithm.
+
+All the implementations can be either found in the form of the branches in the BIND 9 upstream repository#footnote[http://gitlab.isc.org/isc-projects/bind9/] in the above-mentioned branches and the patches against the `main` branch have been placed in the in the thesis git repository mentioned above.  Each patch has been placed in the respective directories in the `patches` subdirectory.
