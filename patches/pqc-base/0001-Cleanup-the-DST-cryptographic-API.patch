@@ -1,0 +1,915 @@
+From 4fcbbfe296234d4dcfa87dbb398a16d16a5d691c Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Ondr=CC=8Cej=20Sury=CC=81?= <ondrej@isc.org>
+Date: Sun, 21 Jul 2024 11:30:09 +0200
+Subject: [PATCH 1/5] Cleanup the DST cryptographic API
+
+The DST API has been cleaned up, duplicate functions has been squashed
+into single call (verify and verify2 functions), and couple of unused
+functions have been completely removed (createctx2, computesecret,
+paramcompare, and cleanup).
+---
+ lib/dns/dnssec.c            |  13 ++---
+ lib/dns/dst_api.c           | 108 ++----------------------------------
+ lib/dns/dst_internal.h      |  14 +----
+ lib/dns/gssapi_link.c       |  35 +++++-------
+ lib/dns/hmac_link.c         |  35 +++++-------
+ lib/dns/include/dst/dst.h   |  67 +---------------------
+ lib/dns/key.c               |  24 --------
+ lib/dns/opensslecdsa_link.c |  38 ++++++-------
+ lib/dns/openssleddsa_link.c |  38 ++++++-------
+ lib/dns/opensslrsa_link.c   |  42 +++++---------
+ lib/dns/tsig.c              |  12 ++--
+ tests/dns/dst_test.c        |  10 ++--
+ tests/dns/rsa_test.c        |  12 ++--
+ tests/dns/tsig_test.c       |   2 +-
+ 14 files changed, 108 insertions(+), 342 deletions(-)
+
+diff --git a/lib/dns/dnssec.c b/lib/dns/dnssec.c
+index 6439d97258..65ccbeeb7b 100644
+--- a/lib/dns/dnssec.c
++++ b/lib/dns/dnssec.c
+@@ -253,8 +253,7 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
+ 		goto cleanup_databuf;
+ 	}
+ 
+-	ret = dst_context_create(key, mctx, DNS_LOGCATEGORY_DNSSEC, true, 0,
+-				 &ctx);
++	ret = dst_context_create(key, mctx, DNS_LOGCATEGORY_DNSSEC, true, &ctx);
+ 	if (ret != ISC_R_SUCCESS) {
+ 		goto cleanup_databuf;
+ 	}
+@@ -435,7 +434,7 @@ dns_dnssec_verify(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
+ 
+ again:
+ 	ret = dst_context_create(key, mctx, DNS_LOGCATEGORY_DNSSEC, false,
+-				 maxbits, &ctx);
++				 &ctx);
+ 	if (ret != ISC_R_SUCCESS) {
+ 		goto cleanup_struct;
+ 	}
+@@ -528,7 +527,7 @@ again:
+ 
+ 	r.base = sig.signature;
+ 	r.length = sig.siglen;
+-	ret = dst_context_verify2(ctx, maxbits, &r);
++	ret = dst_context_verify(ctx, maxbits, &r);
+ 	if (ret == ISC_R_SUCCESS && downcase) {
+ 		char namebuf[DNS_NAME_FORMATSIZE];
+ 		dns_name_format(&sig.signer, namebuf, sizeof(namebuf));
+@@ -785,7 +784,7 @@ dns_dnssec_signmessage(dns_message_t *msg, dst_key_t *key) {
+ 
+ 	isc_buffer_init(&databuf, data, sizeof(data));
+ 
+-	RETERR(dst_context_create(key, mctx, DNS_LOGCATEGORY_DNSSEC, true, 0,
++	RETERR(dst_context_create(key, mctx, DNS_LOGCATEGORY_DNSSEC, true,
+ 				  &ctx));
+ 
+ 	/*
+@@ -937,7 +936,7 @@ dns_dnssec_verifymessage(isc_buffer_t *source, dns_message_t *msg,
+ 		goto failure;
+ 	}
+ 
+-	RETERR(dst_context_create(key, mctx, DNS_LOGCATEGORY_DNSSEC, false, 0,
++	RETERR(dst_context_create(key, mctx, DNS_LOGCATEGORY_DNSSEC, false,
+ 				  &ctx));
+ 
+ 	/*
+@@ -983,7 +982,7 @@ dns_dnssec_verifymessage(isc_buffer_t *source, dns_message_t *msg,
+ 
+ 	sig_r.base = sig.signature;
+ 	sig_r.length = sig.siglen;
+-	result = dst_context_verify(ctx, &sig_r);
++	result = dst_context_verify(ctx, 0, &sig_r);
+ 	if (result != ISC_R_SUCCESS) {
+ 		msg->sig0status = dns_tsigerror_badsig;
+ 		goto failure;
+diff --git a/lib/dns/dst_api.c b/lib/dns/dst_api.c
+index ab2d432c18..32d0a8ca83 100644
+--- a/lib/dns/dst_api.c
++++ b/lib/dns/dst_api.c
+@@ -219,12 +219,6 @@ dst__lib_initialize(void) {
+ 
+ void
+ dst__lib_shutdown(void) {
+-	for (size_t i = 0; i < DST_MAX_ALGS; i++) {
+-		if (dst_t_func[i] != NULL && dst_t_func[i]->cleanup != NULL) {
+-			dst_t_func[i]->cleanup();
+-		}
+-	}
+-
+ 	isc_mem_detach(&dst__mctx);
+ }
+ 
+@@ -245,7 +239,7 @@ dst_ds_digest_supported(unsigned int digest_type) {
+ 
+ isc_result_t
+ dst_context_create(dst_key_t *key, isc_mem_t *mctx, isc_logcategory_t category,
+-		   bool useforsigning, int maxbits, dst_context_t **dctxp) {
++		   bool useforsigning, dst_context_t **dctxp) {
+ 	dst_context_t *dctx;
+ 	isc_result_t result;
+ 
+@@ -253,7 +247,7 @@ dst_context_create(dst_key_t *key, isc_mem_t *mctx, isc_logcategory_t category,
+ 	REQUIRE(mctx != NULL);
+ 	REQUIRE(dctxp != NULL && *dctxp == NULL);
+ 
+-	if (key->func->createctx == NULL && key->func->createctx2 == NULL) {
++	if (key->func->createctx == NULL) {
+ 		return DST_R_UNSUPPORTEDALG;
+ 	}
+ 	if (key->keydata.generic == NULL) {
+@@ -268,11 +262,7 @@ dst_context_create(dst_key_t *key, isc_mem_t *mctx, isc_logcategory_t category,
+ 
+ 	dst_key_attach(key, &dctx->key);
+ 	isc_mem_attach(mctx, &dctx->mctx);
+-	if (key->func->createctx2 != NULL) {
+-		result = key->func->createctx2(key, maxbits, dctx);
+-	} else {
+-		result = key->func->createctx(key, dctx);
+-	}
++	result = key->func->createctx(key, dctx);
+ 	if (result != ISC_R_SUCCESS) {
+ 		if (dctx->key != NULL) {
+ 			dst_key_free(&dctx->key);
+@@ -335,7 +325,7 @@ dst_context_sign(dst_context_t *dctx, isc_buffer_t *sig) {
+ }
+ 
+ isc_result_t
+-dst_context_verify(dst_context_t *dctx, isc_region_t *sig) {
++dst_context_verify(dst_context_t *dctx, int maxbits, isc_region_t *sig) {
+ 	REQUIRE(VALID_CTX(dctx));
+ 	REQUIRE(sig != NULL);
+ 
+@@ -343,57 +333,12 @@ dst_context_verify(dst_context_t *dctx, isc_region_t *sig) {
+ 	if (dctx->key->keydata.generic == NULL) {
+ 		return DST_R_NULLKEY;
+ 	}
++
+ 	if (dctx->key->func->verify == NULL) {
+ 		return DST_R_NOTPUBLICKEY;
+ 	}
+ 
+-	return dctx->key->func->verify(dctx, sig);
+-}
+-
+-isc_result_t
+-dst_context_verify2(dst_context_t *dctx, unsigned int maxbits,
+-		    isc_region_t *sig) {
+-	REQUIRE(VALID_CTX(dctx));
+-	REQUIRE(sig != NULL);
+-
+-	CHECKALG(dctx->key->key_alg);
+-	if (dctx->key->keydata.generic == NULL) {
+-		return DST_R_NULLKEY;
+-	}
+-	if (dctx->key->func->verify == NULL && dctx->key->func->verify2 == NULL)
+-	{
+-		return DST_R_NOTPUBLICKEY;
+-	}
+-
+-	return dctx->key->func->verify2 != NULL
+-		       ? dctx->key->func->verify2(dctx, maxbits, sig)
+-		       : dctx->key->func->verify(dctx, sig);
+-}
+-
+-isc_result_t
+-dst_key_computesecret(const dst_key_t *pub, const dst_key_t *priv,
+-		      isc_buffer_t *secret) {
+-	REQUIRE(VALID_KEY(pub) && VALID_KEY(priv));
+-	REQUIRE(secret != NULL);
+-
+-	CHECKALG(pub->key_alg);
+-	CHECKALG(priv->key_alg);
+-
+-	if (pub->keydata.generic == NULL || priv->keydata.generic == NULL) {
+-		return DST_R_NULLKEY;
+-	}
+-
+-	if (pub->key_alg != priv->key_alg || pub->func->computesecret == NULL ||
+-	    priv->func->computesecret == NULL)
+-	{
+-		return DST_R_KEYCANNOTCOMPUTESECRET;
+-	}
+-
+-	if (!dst_key_isprivate(priv)) {
+-		return DST_R_NOTPRIVATEKEY;
+-	}
+-
+-	return pub->func->computesecret(pub, priv, secret);
++	return dctx->key->func->verify(dctx, maxbits, sig);
+ }
+ 
+ isc_result_t
+@@ -796,29 +741,6 @@ dst_key_tobuffer(const dst_key_t *key, isc_buffer_t *target) {
+ 	return key->func->todns(key, target);
+ }
+ 
+-isc_result_t
+-dst_key_privatefrombuffer(dst_key_t *key, isc_buffer_t *buffer) {
+-	isc_lex_t *lex = NULL;
+-	isc_result_t result = ISC_R_SUCCESS;
+-
+-	REQUIRE(VALID_KEY(key));
+-	REQUIRE(!dst_key_isprivate(key));
+-	REQUIRE(buffer != NULL);
+-
+-	if (key->func->parse == NULL) {
+-		RETERR(DST_R_UNSUPPORTEDALG);
+-	}
+-
+-	isc_lex_create(key->mctx, 1500, &lex);
+-	RETERR(isc_lex_openbuffer(lex, buffer));
+-	RETERR(key->func->parse(key, lex, NULL));
+-out:
+-	if (lex != NULL) {
+-		isc_lex_destroy(&lex);
+-	}
+-	return result;
+-}
+-
+ dns_gss_ctx_id_t
+ dst_key_getgssctx(const dst_key_t *key) {
+ 	REQUIRE(key != NULL);
+@@ -1312,24 +1234,6 @@ dst_key_pubcompare(const dst_key_t *key1, const dst_key_t *key2,
+ 	return comparekeys(key1, key2, match_revoked_key, pub_compare);
+ }
+ 
+-bool
+-dst_key_paramcompare(const dst_key_t *key1, const dst_key_t *key2) {
+-	REQUIRE(VALID_KEY(key1));
+-	REQUIRE(VALID_KEY(key2));
+-
+-	if (key1 == key2) {
+-		return true;
+-	}
+-	if (key1->key_alg == key2->key_alg &&
+-	    key1->func->paramcompare != NULL &&
+-	    key1->func->paramcompare(key1, key2))
+-	{
+-		return true;
+-	} else {
+-		return false;
+-	}
+-}
+-
+ void
+ dst_key_attach(dst_key_t *source, dst_key_t **target) {
+ 	REQUIRE(target != NULL && *target == NULL);
+diff --git a/lib/dns/dst_internal.h b/lib/dns/dst_internal.h
+index 731d4b8602..16f5818082 100644
+--- a/lib/dns/dst_internal.h
++++ b/lib/dns/dst_internal.h
+@@ -150,8 +150,6 @@ struct dst_func {
+ 	 * Context functions
+ 	 */
+ 	isc_result_t (*createctx)(dst_key_t *key, dst_context_t *dctx);
+-	isc_result_t (*createctx2)(dst_key_t *key, int maxbits,
+-				   dst_context_t *dctx);
+ 	void (*destroyctx)(dst_context_t *dctx);
+ 	isc_result_t (*adddata)(dst_context_t *dctx, const isc_region_t *data);
+ 
+@@ -159,14 +157,9 @@ struct dst_func {
+ 	 * Key operations
+ 	 */
+ 	isc_result_t (*sign)(dst_context_t *dctx, isc_buffer_t *sig);
+-	isc_result_t (*verify)(dst_context_t *dctx, const isc_region_t *sig);
+-	isc_result_t (*verify2)(dst_context_t *dctx, int maxbits,
+-				const isc_region_t *sig);
+-	isc_result_t (*computesecret)(const dst_key_t *pub,
+-				      const dst_key_t *priv,
+-				      isc_buffer_t *secret);
++	isc_result_t (*verify)(dst_context_t *dctx, int maxbits,
++			       const isc_region_t *sig);
+ 	bool (*compare)(const dst_key_t *key1, const dst_key_t *key2);
+-	bool (*paramcompare)(const dst_key_t *key1, const dst_key_t *key2);
+ 	isc_result_t (*generate)(dst_key_t *key, int parms,
+ 				 void (*callback)(int));
+ 	bool (*isprivate)(const dst_key_t *key);
+@@ -178,9 +171,6 @@ struct dst_func {
+ 	isc_result_t (*tofile)(const dst_key_t *key, const char *directory);
+ 	isc_result_t (*parse)(dst_key_t *key, isc_lex_t *lexer, dst_key_t *pub);
+ 
+-	/* cleanup */
+-	void (*cleanup)(void);
+-
+ 	isc_result_t (*fromlabel)(dst_key_t *key, const char *label,
+ 				  const char *pin);
+ 	isc_result_t (*dump)(dst_key_t *key, isc_mem_t *mctx, char **buffer,
+diff --git a/lib/dns/gssapi_link.c b/lib/dns/gssapi_link.c
+index bf56e7a3dd..caab5b9686 100644
+--- a/lib/dns/gssapi_link.c
++++ b/lib/dns/gssapi_link.c
+@@ -186,7 +186,8 @@ gssapi_sign(dst_context_t *dctx, isc_buffer_t *sig) {
+  * Verify.
+  */
+ static isc_result_t
+-gssapi_verify(dst_context_t *dctx, const isc_region_t *sig) {
++gssapi_verify(dst_context_t *dctx, int maxbits ISC_ATTR_UNUSED,
++	      const isc_region_t *sig) {
+ 	dst_gssapi_signverifyctx_t *ctx = dctx->ctxdata.gssctx;
+ 	isc_region_t message;
+ 	gss_buffer_desc gmessage, gsig;
+@@ -330,27 +331,17 @@ gssapi_dump(dst_key_t *key, isc_mem_t *mctx, char **buffer, int *length) {
+ }
+ 
+ static dst_func_t gssapi_functions = {
+-	gssapi_create_signverify_ctx,
+-	NULL, /*%< createctx2 */
+-	gssapi_destroy_signverify_ctx,
+-	gssapi_adddata,
+-	gssapi_sign,
+-	gssapi_verify,
+-	NULL, /*%< verify2 */
+-	NULL, /*%< computesecret */
+-	gssapi_compare,
+-	NULL, /*%< paramcompare */
+-	gssapi_generate,
+-	gssapi_isprivate,
+-	gssapi_destroy,
+-	NULL, /*%< todns */
+-	NULL, /*%< fromdns */
+-	NULL, /*%< tofile */
+-	NULL, /*%< parse */
+-	NULL, /*%< cleanup */
+-	NULL, /*%< fromlabel */
+-	gssapi_dump,
+-	gssapi_restore,
++	.createctx = gssapi_create_signverify_ctx,
++	.destroyctx = gssapi_destroy_signverify_ctx,
++	.adddata = gssapi_adddata,
++	.sign = gssapi_sign,
++	.verify = gssapi_verify,
++	.compare = gssapi_compare,
++	.generate = gssapi_generate,
++	.isprivate = gssapi_isprivate,
++	.destroy = gssapi_destroy,
++	.dump = gssapi_dump,
++	.restore = gssapi_restore,
+ };
+ 
+ void
+diff --git a/lib/dns/hmac_link.c b/lib/dns/hmac_link.c
+index ec98b1cb0f..73690d6dcb 100644
+--- a/lib/dns/hmac_link.c
++++ b/lib/dns/hmac_link.c
+@@ -69,6 +69,7 @@
+ 		return (hmac_sign(dctx, sig));                                 \
+ 	}                                                                      \
+ 	static isc_result_t hmac##alg##_verify(dst_context_t *dctx,            \
++					       int maxbits ISC_ATTR_UNUSED,    \
+ 					       const isc_region_t *sig) {      \
+ 		return (hmac_verify(dctx, sig));                               \
+ 	}                                                                      \
+@@ -113,27 +114,19 @@
+ 		return (result);                                               \
+ 	}                                                                      \
+ 	static dst_func_t hmac##alg##_functions = {                            \
+-		hmac##alg##_createctx,                                         \
+-		NULL, /*%< createctx2 */                                       \
+-		hmac##alg##_destroyctx,                                        \
+-		hmac##alg##_adddata,                                           \
+-		hmac##alg##_sign,                                              \
+-		hmac##alg##_verify,                                            \
+-		NULL, /*%< verify2 */                                          \
+-		NULL, /*%< computesecret */                                    \
+-		hmac##alg##_compare,                                           \
+-		NULL, /*%< paramcompare */                                     \
+-		hmac##alg##_generate,                                          \
+-		hmac##alg##_isprivate,                                         \
+-		hmac##alg##_destroy,                                           \
+-		hmac##alg##_todns,                                             \
+-		hmac##alg##_fromdns,                                           \
+-		hmac##alg##_tofile,                                            \
+-		hmac##alg##_parse,                                             \
+-		NULL, /*%< cleanup */                                          \
+-		NULL, /*%< fromlabel */                                        \
+-		NULL, /*%< dump */                                             \
+-		NULL, /*%< restore */                                          \
++		.createctx = hmac##alg##_createctx,                            \
++		.destroyctx = hmac##alg##_destroyctx,                          \
++		.adddata = hmac##alg##_adddata,                                \
++		.sign = hmac##alg##_sign,                                      \
++		.verify = hmac##alg##_verify,                                  \
++		.compare = hmac##alg##_compare,                                \
++		.generate = hmac##alg##_generate,                              \
++		.isprivate = hmac##alg##_isprivate,                            \
++		.destroy = hmac##alg##_destroy,                                \
++		.todns = hmac##alg##_todns,                                    \
++		.fromdns = hmac##alg##_fromdns,                                \
++		.tofile = hmac##alg##_tofile,                                  \
++		.parse = hmac##alg##_parse,                                    \
+ 	};                                                                     \
+ 	void dst__hmac##alg##_init(dst_func_t **funcp) {                       \
+ 		REQUIRE(funcp != NULL);                                        \
+diff --git a/lib/dns/include/dst/dst.h b/lib/dns/include/dst/dst.h
+index f6e1e2e05b..f6295793c3 100644
+--- a/lib/dns/include/dst/dst.h
++++ b/lib/dns/include/dst/dst.h
+@@ -218,7 +218,7 @@ dst_ds_digest_supported(unsigned int digest_type);
+ 
+ isc_result_t
+ dst_context_create(dst_key_t *key, isc_mem_t *mctx, isc_logcategory_t category,
+-		   bool useforsigning, int maxbits, dst_context_t **dctxp);
++		   bool useforsigning, dst_context_t **dctxp);
+ /*%<
+  * Creates a context to be used for a sign or verify operation.
+  *
+@@ -284,11 +284,7 @@ dst_context_sign(dst_context_t *dctx, isc_buffer_t *sig);
+  */
+ 
+ isc_result_t
+-dst_context_verify(dst_context_t *dctx, isc_region_t *sig);
+-
+-isc_result_t
+-dst_context_verify2(dst_context_t *dctx, unsigned int maxbits,
+-		    isc_region_t *sig);
++dst_context_verify(dst_context_t *dctx, int maxbits, isc_region_t *sig);
+ /*%<
+  * Verifies the signature using the data and key stored in the context.
+  *
+@@ -307,25 +303,6 @@ dst_context_verify2(dst_context_t *dctx, unsigned int maxbits,
+  * \li	"sig" will contain the signature
+  */
+ 
+-isc_result_t
+-dst_key_computesecret(const dst_key_t *pub, const dst_key_t *priv,
+-		      isc_buffer_t *secret);
+-/*%<
+- * Computes a shared secret from two (Diffie-Hellman) keys.
+- *
+- * Requires:
+- * \li	"pub" is a valid key that can be used to derive a shared secret
+- * \li	"priv" is a valid private key that can be used to derive a shared secret
+- * \li	"secret" is a valid buffer
+- *
+- * Returns:
+- * \li	ISC_R_SUCCESS
+- * \li	any other result indicates failure
+- *
+- * Ensures:
+- * \li	If successful, secret will contain the derived shared secret.
+- */
+-
+ isc_result_t
+ dst_key_getfilename(dns_name_t *name, dns_keytag_t id, unsigned int alg,
+ 		    int type, const char *directory, isc_mem_t *mctx,
+@@ -537,25 +514,6 @@ dst_key_tobuffer(const dst_key_t *key, isc_buffer_t *target);
+  *\li	If successful, the used pointer in 'target' is advanced.
+  */
+ 
+-isc_result_t
+-dst_key_privatefrombuffer(dst_key_t *key, isc_buffer_t *buffer);
+-/*%<
+- * Converts a public key into a private key, reading the private key
+- * information from the buffer.  The buffer should contain the same data
+- * as the .private key file would.
+- *
+- * Requires:
+- *\li	"key" is a valid public key.
+- *\li	"buffer" is not NULL.
+- *
+- * Returns:
+- *\li 	ISC_R_SUCCESS
+- * \li	any other result indicates failure
+- *
+- * Ensures:
+- *\li	If successful, key will contain a valid private key.
+- */
+-
+ dns_gss_ctx_id_t
+ dst_key_getgssctx(const dst_key_t *key);
+ /*%<
+@@ -671,21 +629,6 @@ dst_key_pubcompare(const dst_key_t *key1, const dst_key_t *key2,
+  * \li	false
+  */
+ 
+-bool
+-dst_key_paramcompare(const dst_key_t *key1, const dst_key_t *key2);
+-/*%<
+- * Compares the parameters of two DST keys.  This is used to determine if
+- * two (Diffie-Hellman) keys can be used to derive a shared secret.
+- *
+- * Requires:
+- *\li	"key1" is a valid key.
+- *\li	"key2" is a valid key.
+- *
+- * Returns:
+- *\li 	true
+- * \li	false
+- */
+-
+ void
+ dst_key_attach(dst_key_t *source, dst_key_t **target);
+ /*
+@@ -723,9 +666,6 @@ dst_key_name(const dst_key_t *key);
+ unsigned int
+ dst_key_size(const dst_key_t *key);
+ 
+-unsigned int
+-dst_key_proto(const dst_key_t *key);
+-
+ unsigned int
+ dst_key_alg(const dst_key_t *key);
+ 
+@@ -750,9 +690,6 @@ dst_key_isprivate(const dst_key_t *key);
+ bool
+ dst_key_iszonekey(const dst_key_t *key);
+ 
+-bool
+-dst_key_isnullkey(const dst_key_t *key);
+-
+ bool
+ dst_key_have_ksk_and_zsk(dst_key_t **keys, unsigned int nkeys, unsigned int i,
+ 			 bool check_offline, bool ksk, bool zsk, bool *have_ksk,
+diff --git a/lib/dns/key.c b/lib/dns/key.c
+index 07bd5cf88e..d341f1781b 100644
+--- a/lib/dns/key.c
++++ b/lib/dns/key.c
+@@ -88,12 +88,6 @@ dst_key_size(const dst_key_t *key) {
+ 	return key->key_size;
+ }
+ 
+-unsigned int
+-dst_key_proto(const dst_key_t *key) {
+-	REQUIRE(VALID_KEY(key));
+-	return key->key_proto;
+-}
+-
+ unsigned int
+ dst_key_alg(const dst_key_t *key) {
+ 	REQUIRE(VALID_KEY(key));
+@@ -145,24 +139,6 @@ dst_key_iszonekey(const dst_key_t *key) {
+ 	return true;
+ }
+ 
+-bool
+-dst_key_isnullkey(const dst_key_t *key) {
+-	REQUIRE(VALID_KEY(key));
+-
+-	if ((key->key_flags & DNS_KEYFLAG_TYPEMASK) != DNS_KEYTYPE_NOKEY) {
+-		return false;
+-	}
+-	if ((key->key_flags & DNS_KEYFLAG_OWNERMASK) != DNS_KEYOWNER_ZONE) {
+-		return false;
+-	}
+-	if (key->key_proto != DNS_KEYPROTO_DNSSEC &&
+-	    key->key_proto != DNS_KEYPROTO_ANY)
+-	{
+-		return false;
+-	}
+-	return true;
+-}
+-
+ #define REVOKE(x) ((dst_key_flags(x) & DNS_KEYFLAG_REVOKE) != 0)
+ #define KSK(x)	  ((dst_key_flags(x) & DNS_KEYFLAG_KSK) != 0)
+ #define ID(x)	  dst_key_id(x)
+diff --git a/lib/dns/opensslecdsa_link.c b/lib/dns/opensslecdsa_link.c
+index 821a50289d..a5f3ef6bf2 100644
+--- a/lib/dns/opensslecdsa_link.c
++++ b/lib/dns/opensslecdsa_link.c
+@@ -838,7 +838,8 @@ err:
+ }
+ 
+ static isc_result_t
+-opensslecdsa_verify(dst_context_t *dctx, const isc_region_t *sig) {
++opensslecdsa_verify(dst_context_t *dctx, int maxbits ISC_ATTR_UNUSED,
++		    const isc_region_t *sig) {
+ 	isc_result_t ret;
+ 	dst_key_t *key = dctx->key;
+ 	int status;
+@@ -1172,27 +1173,20 @@ err:
+ }
+ 
+ static dst_func_t opensslecdsa_functions = {
+-	opensslecdsa_createctx,
+-	NULL, /*%< createctx2 */
+-	opensslecdsa_destroyctx,
+-	opensslecdsa_adddata,
+-	opensslecdsa_sign,
+-	opensslecdsa_verify,
+-	NULL, /*%< verify2 */
+-	NULL, /*%< computesecret */
+-	dst__openssl_keypair_compare,
+-	NULL, /*%< paramcompare */
+-	opensslecdsa_generate,
+-	dst__openssl_keypair_isprivate,
+-	dst__openssl_keypair_destroy,
+-	opensslecdsa_todns,
+-	opensslecdsa_fromdns,
+-	opensslecdsa_tofile,
+-	opensslecdsa_parse,
+-	NULL,			/*%< cleanup */
+-	opensslecdsa_fromlabel, /*%< fromlabel */
+-	NULL,			/*%< dump */
+-	NULL,			/*%< restore */
++	.createctx = opensslecdsa_createctx,
++	.destroyctx = opensslecdsa_destroyctx,
++	.adddata = opensslecdsa_adddata,
++	.sign = opensslecdsa_sign,
++	.verify = opensslecdsa_verify,
++	.compare = dst__openssl_keypair_compare,
++	.generate = opensslecdsa_generate,
++	.isprivate = dst__openssl_keypair_isprivate,
++	.destroy = dst__openssl_keypair_destroy,
++	.todns = opensslecdsa_todns,
++	.fromdns = opensslecdsa_fromdns,
++	.tofile = opensslecdsa_tofile,
++	.parse = opensslecdsa_parse,
++	.fromlabel = opensslecdsa_fromlabel,
+ };
+ 
+ void
+diff --git a/lib/dns/openssleddsa_link.c b/lib/dns/openssleddsa_link.c
+index 09ac4e1d59..be71476ebd 100644
+--- a/lib/dns/openssleddsa_link.c
++++ b/lib/dns/openssleddsa_link.c
+@@ -211,7 +211,8 @@ err:
+ }
+ 
+ static isc_result_t
+-openssleddsa_verify(dst_context_t *dctx, const isc_region_t *sig) {
++openssleddsa_verify(dst_context_t *dctx, int maxbits ISC_ATTR_UNUSED,
++		    const isc_region_t *sig) {
+ 	isc_result_t ret;
+ 	dst_key_t *key = dctx->key;
+ 	int status;
+@@ -526,27 +527,20 @@ err:
+ }
+ 
+ static dst_func_t openssleddsa_functions = {
+-	openssleddsa_createctx,
+-	NULL, /*%< createctx2 */
+-	openssleddsa_destroyctx,
+-	openssleddsa_adddata,
+-	openssleddsa_sign,
+-	openssleddsa_verify,
+-	NULL, /*%< verify2 */
+-	NULL, /*%< computesecret */
+-	dst__openssl_keypair_compare,
+-	NULL, /*%< paramcompare */
+-	openssleddsa_generate,
+-	dst__openssl_keypair_isprivate,
+-	dst__openssl_keypair_destroy,
+-	openssleddsa_todns,
+-	openssleddsa_fromdns,
+-	openssleddsa_tofile,
+-	openssleddsa_parse,
+-	NULL, /*%< cleanup */
+-	openssleddsa_fromlabel,
+-	NULL, /*%< dump */
+-	NULL, /*%< restore */
++	.createctx = openssleddsa_createctx,
++	.destroyctx = openssleddsa_destroyctx,
++	.adddata = openssleddsa_adddata,
++	.sign = openssleddsa_sign,
++	.verify = openssleddsa_verify,
++	.compare = dst__openssl_keypair_compare,
++	.generate = openssleddsa_generate,
++	.isprivate = dst__openssl_keypair_isprivate,
++	.destroy = dst__openssl_keypair_destroy,
++	.todns = openssleddsa_todns,
++	.fromdns = openssleddsa_fromdns,
++	.tofile = openssleddsa_tofile,
++	.parse = openssleddsa_parse,
++	.fromlabel = openssleddsa_fromlabel,
+ };
+ 
+ /*
+diff --git a/lib/dns/opensslrsa_link.c b/lib/dns/opensslrsa_link.c
+index 9662e7c93a..62617cfeeb 100644
+--- a/lib/dns/opensslrsa_link.c
++++ b/lib/dns/opensslrsa_link.c
+@@ -310,7 +310,7 @@ opensslrsa_check_exponent_bits(EVP_PKEY *pkey, int maxbits) {
+ }
+ 
+ static isc_result_t
+-opensslrsa_verify2(dst_context_t *dctx, int maxbits, const isc_region_t *sig) {
++opensslrsa_verify(dst_context_t *dctx, int maxbits, const isc_region_t *sig) {
+ 	dst_key_t *key = NULL;
+ 	int status = 0;
+ 	EVP_MD_CTX *evp_md_ctx = NULL;
+@@ -339,11 +339,6 @@ opensslrsa_verify2(dst_context_t *dctx, int maxbits, const isc_region_t *sig) {
+ 	}
+ }
+ 
+-static isc_result_t
+-opensslrsa_verify(dst_context_t *dctx, const isc_region_t *sig) {
+-	return opensslrsa_verify2(dctx, 0, sig);
+-}
+-
+ #if OPENSSL_VERSION_NUMBER < 0x30000000L
+ static int
+ progress_cb(int p, int n, BN_GENCB *cb) {
+@@ -1123,27 +1118,20 @@ err:
+ }
+ 
+ static dst_func_t opensslrsa_functions = {
+-	opensslrsa_createctx,
+-	NULL, /*%< createctx2 */
+-	opensslrsa_destroyctx,
+-	opensslrsa_adddata,
+-	opensslrsa_sign,
+-	opensslrsa_verify,
+-	opensslrsa_verify2,
+-	NULL, /*%< computesecret */
+-	dst__openssl_keypair_compare,
+-	NULL, /*%< paramcompare */
+-	opensslrsa_generate,
+-	dst__openssl_keypair_isprivate,
+-	dst__openssl_keypair_destroy,
+-	opensslrsa_todns,
+-	opensslrsa_fromdns,
+-	opensslrsa_tofile,
+-	opensslrsa_parse,
+-	NULL, /*%< cleanup */
+-	opensslrsa_fromlabel,
+-	NULL, /*%< dump */
+-	NULL, /*%< restore */
++	.createctx = opensslrsa_createctx,
++	.destroyctx = opensslrsa_destroyctx,
++	.adddata = opensslrsa_adddata,
++	.sign = opensslrsa_sign,
++	.verify = opensslrsa_verify,
++	.compare = dst__openssl_keypair_compare,
++	.generate = opensslrsa_generate,
++	.isprivate = dst__openssl_keypair_isprivate,
++	.destroy = dst__openssl_keypair_destroy,
++	.todns = opensslrsa_todns,
++	.fromdns = opensslrsa_fromdns,
++	.tofile = opensslrsa_tofile,
++	.parse = opensslrsa_parse,
++	.fromlabel = opensslrsa_fromlabel,
+ };
+ 
+ /*
+diff --git a/lib/dns/tsig.c b/lib/dns/tsig.c
+index 57da184658..3605babee0 100644
+--- a/lib/dns/tsig.c
++++ b/lib/dns/tsig.c
+@@ -631,8 +631,8 @@ dns_tsig_sign(dns_message_t *msg) {
+ 		 * has validated at this point. This is why we include a
+ 		 * MAC length > 0 in the reply.
+ 		 */
+-		result = dst_context_create(
+-			key->key, mctx, DNS_LOGCATEGORY_DNSSEC, true, 0, &ctx);
++		result = dst_context_create(key->key, mctx,
++					    DNS_LOGCATEGORY_DNSSEC, true, &ctx);
+ 		if (result != ISC_R_SUCCESS) {
+ 			return result;
+ 		}
+@@ -1005,7 +1005,7 @@ dns_tsig_verify(isc_buffer_t *source, dns_message_t *msg,
+ 		sig_r.length = tsig.siglen;
+ 
+ 		result = dst_context_create(key, mctx, DNS_LOGCATEGORY_DNSSEC,
+-					    false, 0, &ctx);
++					    false, &ctx);
+ 		if (result != ISC_R_SUCCESS) {
+ 			return result;
+ 		}
+@@ -1117,7 +1117,7 @@ dns_tsig_verify(isc_buffer_t *source, dns_message_t *msg,
+ 			}
+ 		}
+ 
+-		result = dst_context_verify(ctx, &sig_r);
++		result = dst_context_verify(ctx, 0, &sig_r);
+ 		if (result == DST_R_VERIFYFAILURE) {
+ 			result = DNS_R_TSIGVERIFYFAILURE;
+ 			tsig_log(msg->tsigkey, 2,
+@@ -1308,7 +1308,7 @@ tsig_verify_tcp(isc_buffer_t *source, dns_message_t *msg) {
+ 
+ 	if (msg->tsigctx == NULL) {
+ 		result = dst_context_create(key, mctx, DNS_LOGCATEGORY_DNSSEC,
+-					    false, 0, &msg->tsigctx);
++					    false, &msg->tsigctx);
+ 		if (result != ISC_R_SUCCESS) {
+ 			goto cleanup_querystruct;
+ 		}
+@@ -1420,7 +1420,7 @@ tsig_verify_tcp(isc_buffer_t *source, dns_message_t *msg) {
+ 			goto cleanup_context;
+ 		}
+ 
+-		result = dst_context_verify(msg->tsigctx, &sig_r);
++		result = dst_context_verify(msg->tsigctx, 0, &sig_r);
+ 		if (result == DST_R_VERIFYFAILURE) {
+ 			tsig_log(msg->tsigkey, 2,
+ 				 "signature failed to verify(2)");
+diff --git a/tests/dns/dst_test.c b/tests/dns/dst_test.c
+index 46d46a5c02..a98c40b00d 100644
+--- a/tests/dns/dst_test.c
++++ b/tests/dns/dst_test.c
+@@ -188,12 +188,12 @@ check_sig(const char *datapath, const char *sigpath, const char *keyname,
+ 	isc_buffer_remainingregion(&sigbuf, &sigreg);
+ 
+ 	result = dst_context_create(key, mctx, DNS_LOGCATEGORY_GENERAL, false,
+-				    0, &ctx);
++				    &ctx);
+ 	assert_int_equal(result, ISC_R_SUCCESS);
+ 
+ 	result = dst_context_adddata(ctx, &datareg);
+ 	assert_int_equal(result, ISC_R_SUCCESS);
+-	result = dst_context_verify(ctx, &sigreg);
++	result = dst_context_verify(ctx, 0, &sigreg);
+ 
+ 	/*
+ 	 * Compute the expected signature and emit it
+@@ -206,7 +206,7 @@ check_sig(const char *datapath, const char *sigpath, const char *keyname,
+ 
+ 		dst_context_destroy(&ctx);
+ 		result2 = dst_context_create(key, mctx, DNS_LOGCATEGORY_GENERAL,
+-					     false, 0, &ctx);
++					     false, &ctx);
+ 		assert_int_equal(result2, ISC_R_SUCCESS);
+ 
+ 		result2 = dst_context_adddata(ctx, &datareg);
+@@ -455,7 +455,7 @@ ISC_RUN_TEST_IMPL(ecdsa_determinism_test) {
+ 	assert_int_equal(result, ISC_R_SUCCESS);
+ 
+ 	isc_buffer_allocate(mctx, &sigbuf1, siglen);
+-	result = dst_context_create(key, mctx, DNS_LOGCATEGORY_GENERAL, true, 0,
++	result = dst_context_create(key, mctx, DNS_LOGCATEGORY_GENERAL, true,
+ 				    &ctx);
+ 	assert_int_equal(result, ISC_R_SUCCESS);
+ 	result = dst_context_sign(ctx, sigbuf1);
+@@ -463,7 +463,7 @@ ISC_RUN_TEST_IMPL(ecdsa_determinism_test) {
+ 	dst_context_destroy(&ctx);
+ 
+ 	isc_buffer_allocate(mctx, &sigbuf2, siglen);
+-	result = dst_context_create(key, mctx, DNS_LOGCATEGORY_GENERAL, true, 0,
++	result = dst_context_create(key, mctx, DNS_LOGCATEGORY_GENERAL, true,
+ 				    &ctx);
+ 	assert_int_equal(result, ISC_R_SUCCESS);
+ 	result = dst_context_sign(ctx, sigbuf2);
+diff --git a/tests/dns/rsa_test.c b/tests/dns/rsa_test.c
+index 89a347e2e3..09aee74631 100644
+--- a/tests/dns/rsa_test.c
++++ b/tests/dns/rsa_test.c
+@@ -145,7 +145,7 @@ ISC_RUN_TEST_IMPL(isc_rsa_verify) {
+ 		key->key_alg = DST_ALG_RSASHA1;
+ 
+ 		ret = dst_context_create(key, mctx, DNS_LOGCATEGORY_DNSSEC,
+-					 false, 0, &ctx);
++					 false, &ctx);
+ 		assert_int_equal(ret, ISC_R_SUCCESS);
+ 
+ 		r.base = d;
+@@ -155,7 +155,7 @@ ISC_RUN_TEST_IMPL(isc_rsa_verify) {
+ 
+ 		r.base = sigsha1;
+ 		r.length = 256;
+-		ret = dst_context_verify(ctx, &r);
++		ret = dst_context_verify(ctx, 0, &r);
+ 		assert_int_equal(ret, ISC_R_SUCCESS);
+ 
+ 		dst_context_destroy(&ctx);
+@@ -165,7 +165,7 @@ ISC_RUN_TEST_IMPL(isc_rsa_verify) {
+ 
+ 	key->key_alg = DST_ALG_RSASHA256;
+ 
+-	ret = dst_context_create(key, mctx, DNS_LOGCATEGORY_DNSSEC, false, 0,
++	ret = dst_context_create(key, mctx, DNS_LOGCATEGORY_DNSSEC, false,
+ 				 &ctx);
+ 	assert_int_equal(ret, ISC_R_SUCCESS);
+ 
+@@ -176,7 +176,7 @@ ISC_RUN_TEST_IMPL(isc_rsa_verify) {
+ 
+ 	r.base = sigsha256;
+ 	r.length = 256;
+-	ret = dst_context_verify(ctx, &r);
++	ret = dst_context_verify(ctx, 0, &r);
+ 	assert_int_equal(ret, ISC_R_SUCCESS);
+ 
+ 	dst_context_destroy(&ctx);
+@@ -185,7 +185,7 @@ ISC_RUN_TEST_IMPL(isc_rsa_verify) {
+ 
+ 	key->key_alg = DST_ALG_RSASHA512;
+ 
+-	ret = dst_context_create(key, mctx, DNS_LOGCATEGORY_DNSSEC, false, 0,
++	ret = dst_context_create(key, mctx, DNS_LOGCATEGORY_DNSSEC, false,
+ 				 &ctx);
+ 	assert_int_equal(ret, ISC_R_SUCCESS);
+ 
+@@ -196,7 +196,7 @@ ISC_RUN_TEST_IMPL(isc_rsa_verify) {
+ 
+ 	r.base = sigsha512;
+ 	r.length = 256;
+-	ret = dst_context_verify(ctx, &r);
++	ret = dst_context_verify(ctx, 0, &r);
+ 	assert_int_equal(ret, ISC_R_SUCCESS);
+ 
+ 	dst_context_destroy(&ctx);
+diff --git a/tests/dns/tsig_test.c b/tests/dns/tsig_test.c
+index 601bdbb3cb..ee9ce6d4bb 100644
+--- a/tests/dns/tsig_test.c
++++ b/tests/dns/tsig_test.c
+@@ -324,7 +324,7 @@ tsig_tcp(isc_stdtime_t now, isc_result_t expected_result, bool mangle_sig) {
+ 	dns_message_detach(&msg);
+ 
+ 	result = dst_context_create(key->key, mctx, DNS_LOGCATEGORY_DNSSEC,
+-				    false, 0, &outctx);
++				    false, &outctx);
+ 	assert_int_equal(result, ISC_R_SUCCESS);
+ 	assert_non_null(outctx);
+ 
+-- 
+2.43.0
+

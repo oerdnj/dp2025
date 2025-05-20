@@ -1,0 +1,511 @@
+From 53314385bc45a91318b076770d83c109141fe9d7 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Ond=C5=99ej=20Sur=C3=BD?= <ondrej@isc.org>
+Date: Mon, 28 Apr 2025 17:22:18 +0200
+Subject: [PATCH 2/2] Deprecate max-rsa-exponent-size, always use 4096 instead
+
+The `max-rsa-exponent-size` could limit the exponents of the RSA
+public keys during the DNSSEC verification.  Instead of providing
+a cryptic (not cryptographic) knob, hardcode the max exponent to
+be 4096 (the theoretical maximum for DNSSEC).
+---
+ bin/dnssec/dnssec-cds.c      |  2 +-
+ bin/dnssec/dnssec-signzone.c |  4 ++--
+ bin/named/server.c           | 16 ----------------
+ doc/arm/reference.rst        |  7 +++----
+ lib/dns/dnssec.c             | 12 ++++++------
+ lib/dns/dst_api.c            |  4 ++--
+ lib/dns/dst_internal.h       |  3 +--
+ lib/dns/gssapi_link.c        |  3 +--
+ lib/dns/hmac_link.c          |  1 -
+ lib/dns/include/dns/dnssec.h |  4 ++--
+ lib/dns/include/dns/view.h   |  1 -
+ lib/dns/include/dst/dst.h    |  5 +----
+ lib/dns/opensslecdsa_link.c  |  3 +--
+ lib/dns/openssleddsa_link.c  |  3 +--
+ lib/dns/opensslrsa_link.c    | 15 +++++++++------
+ lib/dns/tsig.c               |  4 ++--
+ lib/dns/validator.c          | 10 ++++------
+ lib/dns/zone.c               |  9 ++++-----
+ lib/dns/zoneverify.c         |  2 +-
+ lib/ns/query.c               |  3 +--
+ tests/dns/dst_test.c         |  2 +-
+ tests/dns/rsa_test.c         |  6 +++---
+ 22 files changed, 46 insertions(+), 73 deletions(-)
+
+diff --git a/bin/dnssec/dnssec-cds.c b/bin/dnssec/dnssec-cds.c
+index b79984be7f..b3bb3a5c79 100644
+--- a/bin/dnssec/dnssec-cds.c
++++ b/bin/dnssec/dnssec-cds.c
+@@ -648,7 +648,7 @@ matching_sigs(keyinfo_t *keytbl, dns_rdataset_t *rdataset,
+ 			}
+ 
+ 			result = dns_dnssec_verify(name, rdataset, ki->dst,
+-						   false, 0, mctx, &sigrdata,
++						   false, mctx, &sigrdata,
+ 						   NULL);
+ 
+ 			if (result != ISC_R_SUCCESS &&
+diff --git a/bin/dnssec/dnssec-signzone.c b/bin/dnssec/dnssec-signzone.c
+index 6dac95346b..177fb0140c 100644
+--- a/bin/dnssec/dnssec-signzone.c
++++ b/bin/dnssec/dnssec-signzone.c
+@@ -303,7 +303,7 @@ signwithkey(dns_name_t *name, dns_rdataset_t *rdataset, dst_key_t *key,
+ 	INCSTAT(nsigned);
+ 
+ 	if (tryverify) {
+-		result = dns_dnssec_verify(name, rdataset, key, true, 0, mctx,
++		result = dns_dnssec_verify(name, rdataset, key, true, mctx,
+ 					   &trdata, NULL);
+ 		if (result == ISC_R_SUCCESS || result == DNS_R_FROMWILDCARD) {
+ 			vbprintf(3, "\tsignature verified\n");
+@@ -460,7 +460,7 @@ static bool
+ setverifies(dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
+ 	    dns_rdata_t *rrsig) {
+ 	isc_result_t result;
+-	result = dns_dnssec_verify(name, set, key, false, 0, mctx, rrsig, NULL);
++	result = dns_dnssec_verify(name, set, key, false, mctx, rrsig, NULL);
+ 	if (result == ISC_R_SUCCESS || result == DNS_R_FROMWILDCARD) {
+ 		INCSTAT(nverified);
+ 		return true;
+diff --git a/bin/named/server.c b/bin/named/server.c
+index 0b3e735285..14fcc7ae13 100644
+--- a/bin/named/server.c
++++ b/bin/named/server.c
+@@ -3763,7 +3763,6 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
+ 	const char *cachename = NULL;
+ 	dns_order_t *order = NULL;
+ 	uint32_t udpsize;
+-	uint32_t maxbits;
+ 	unsigned int resopts = 0;
+ 	dns_zone_t *zone = NULL;
+ 	uint32_t clients_per_query, max_clients_per_query;
+@@ -4603,21 +4602,6 @@ configure_view(dns_view_t *view, dns_viewlist_t *viewlist, cfg_obj_t *config,
+ 	}
+ 	view->nocookieudp = udpsize;
+ 
+-	/*
+-	 * Set the maximum rsa exponent bits.
+-	 */
+-	obj = NULL;
+-	result = named_config_get(maps, "max-rsa-exponent-size", &obj);
+-	INSIST(result == ISC_R_SUCCESS);
+-	maxbits = cfg_obj_asuint32(obj);
+-	if (maxbits != 0 && maxbits < 35) {
+-		maxbits = 35;
+-	}
+-	if (maxbits > 4096) {
+-		maxbits = 4096;
+-	}
+-	view->maxbits = maxbits;
+-
+ 	/*
+ 	 * Set supported DNSSEC algorithms.
+ 	 */
+diff --git a/doc/arm/reference.rst b/doc/arm/reference.rst
+index 35c65fe035..f2b9d0193e 100644
+--- a/doc/arm/reference.rst
++++ b/doc/arm/reference.rst
+@@ -4474,12 +4474,11 @@ Tuning
+    controlled by :any:`notify-rate`.
+ 
+ .. namedconf:statement:: max-rsa-exponent-size
+-   :tags: dnssec, query
++   :tags: deprecated
+    :short: Sets the maximum RSA exponent size (in bits) when validating.
+ 
+-   This sets the maximum RSA exponent size, in bits, that is accepted when
+-   validating. Valid values are 35 to 4096 bits. The default, zero, is
+-   also accepted and is equivalent to 4096.
++   The maximum RSA exponent size is now always 4096.  This option is
++   deprecated, and will be rendered non-operational in a future release.
+ 
+ .. namedconf:statement:: prefetch
+    :tags: query
+diff --git a/lib/dns/dnssec.c b/lib/dns/dnssec.c
+index 65ccbeeb7b..61de0005d3 100644
+--- a/lib/dns/dnssec.c
++++ b/lib/dns/dnssec.c
+@@ -355,8 +355,8 @@ cleanup_databuf:
+ 
+ isc_result_t
+ dns_dnssec_verify(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
+-		  bool ignoretime, unsigned int maxbits, isc_mem_t *mctx,
+-		  dns_rdata_t *sigrdata, dns_name_t *wild) {
++		  bool ignoretime, isc_mem_t *mctx, dns_rdata_t *sigrdata,
++		  dns_name_t *wild) {
+ 	dns_rdata_rrsig_t sig;
+ 	dns_fixedname_t fnewname;
+ 	isc_region_t r;
+@@ -527,7 +527,7 @@ again:
+ 
+ 	r.base = sig.signature;
+ 	r.length = sig.siglen;
+-	ret = dst_context_verify(ctx, maxbits, &r);
++	ret = dst_context_verify(ctx, &r);
+ 	if (ret == ISC_R_SUCCESS && downcase) {
+ 		char namebuf[DNS_NAME_FORMATSIZE];
+ 		dns_name_format(&sig.signer, namebuf, sizeof(namebuf));
+@@ -982,7 +982,7 @@ dns_dnssec_verifymessage(isc_buffer_t *source, dns_message_t *msg,
+ 
+ 	sig_r.base = sig.signature;
+ 	sig_r.length = sig.siglen;
+-	result = dst_context_verify(ctx, 0, &sig_r);
++	result = dst_context_verify(ctx, &sig_r);
+ 	if (result != ISC_R_SUCCESS) {
+ 		msg->sig0status = dns_tsigerror_badsig;
+ 		goto failure;
+@@ -1062,8 +1062,8 @@ dns_dnssec_signs(dns_rdata_t *rdata, const dns_name_t *name,
+ 
+ 		if (sig.algorithm == key.algorithm && sig.keyid == keytag) {
+ 			result = dns_dnssec_verify(name, rdataset, dstkey,
+-						   ignoretime, 0, mctx,
+-						   &sigrdata, NULL);
++						   ignoretime, mctx, &sigrdata,
++						   NULL);
+ 			if (result == ISC_R_SUCCESS) {
+ 				dst_key_free(&dstkey);
+ 				return true;
+diff --git a/lib/dns/dst_api.c b/lib/dns/dst_api.c
+index 32d0a8ca83..9426f9c260 100644
+--- a/lib/dns/dst_api.c
++++ b/lib/dns/dst_api.c
+@@ -325,7 +325,7 @@ dst_context_sign(dst_context_t *dctx, isc_buffer_t *sig) {
+ }
+ 
+ isc_result_t
+-dst_context_verify(dst_context_t *dctx, int maxbits, isc_region_t *sig) {
++dst_context_verify(dst_context_t *dctx, isc_region_t *sig) {
+ 	REQUIRE(VALID_CTX(dctx));
+ 	REQUIRE(sig != NULL);
+ 
+@@ -338,7 +338,7 @@ dst_context_verify(dst_context_t *dctx, int maxbits, isc_region_t *sig) {
+ 		return DST_R_NOTPUBLICKEY;
+ 	}
+ 
+-	return dctx->key->func->verify(dctx, maxbits, sig);
++	return dctx->key->func->verify(dctx, sig);
+ }
+ 
+ isc_result_t
+diff --git a/lib/dns/dst_internal.h b/lib/dns/dst_internal.h
+index 16f5818082..049d634987 100644
+--- a/lib/dns/dst_internal.h
++++ b/lib/dns/dst_internal.h
+@@ -157,8 +157,7 @@ struct dst_func {
+ 	 * Key operations
+ 	 */
+ 	isc_result_t (*sign)(dst_context_t *dctx, isc_buffer_t *sig);
+-	isc_result_t (*verify)(dst_context_t *dctx, int maxbits,
+-			       const isc_region_t *sig);
++	isc_result_t (*verify)(dst_context_t *dctx, const isc_region_t *sig);
+ 	bool (*compare)(const dst_key_t *key1, const dst_key_t *key2);
+ 	isc_result_t (*generate)(dst_key_t *key, int parms,
+ 				 void (*callback)(int));
+diff --git a/lib/dns/gssapi_link.c b/lib/dns/gssapi_link.c
+index caab5b9686..ffe428601f 100644
+--- a/lib/dns/gssapi_link.c
++++ b/lib/dns/gssapi_link.c
+@@ -186,8 +186,7 @@ gssapi_sign(dst_context_t *dctx, isc_buffer_t *sig) {
+  * Verify.
+  */
+ static isc_result_t
+-gssapi_verify(dst_context_t *dctx, int maxbits ISC_ATTR_UNUSED,
+-	      const isc_region_t *sig) {
++gssapi_verify(dst_context_t *dctx, const isc_region_t *sig) {
+ 	dst_gssapi_signverifyctx_t *ctx = dctx->ctxdata.gssctx;
+ 	isc_region_t message;
+ 	gss_buffer_desc gmessage, gsig;
+diff --git a/lib/dns/hmac_link.c b/lib/dns/hmac_link.c
+index 73690d6dcb..c84ce8efc1 100644
+--- a/lib/dns/hmac_link.c
++++ b/lib/dns/hmac_link.c
+@@ -69,7 +69,6 @@
+ 		return (hmac_sign(dctx, sig));                                 \
+ 	}                                                                      \
+ 	static isc_result_t hmac##alg##_verify(dst_context_t *dctx,            \
+-					       int maxbits ISC_ATTR_UNUSED,    \
+ 					       const isc_region_t *sig) {      \
+ 		return (hmac_verify(dctx, sig));                               \
+ 	}                                                                      \
+diff --git a/lib/dns/include/dns/dnssec.h b/lib/dns/include/dns/dnssec.h
+index 400e002338..38883b6343 100644
+--- a/lib/dns/include/dns/dnssec.h
++++ b/lib/dns/include/dns/dnssec.h
+@@ -140,8 +140,8 @@ dns_dnssec_sign(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
+ 
+ isc_result_t
+ dns_dnssec_verify(const dns_name_t *name, dns_rdataset_t *set, dst_key_t *key,
+-		  bool ignoretime, unsigned int maxbits, isc_mem_t *mctx,
+-		  dns_rdata_t *sigrdata, dns_name_t *wild);
++		  bool ignoretime, isc_mem_t *mctx, dns_rdata_t *sigrdata,
++		  dns_name_t *wild);
+ /*%<
+  *	Verifies the RRSIG record covering this rdataset signed by a specific
+  *	key.  This does not determine if the key's owner is authorized to sign
+diff --git a/lib/dns/include/dns/view.h b/lib/dns/include/dns/view.h
+index 4cd2f66ad1..f33192d39e 100644
+--- a/lib/dns/include/dns/view.h
++++ b/lib/dns/include/dns/view.h
+@@ -169,7 +169,6 @@ struct dns_view {
+ 	uint16_t	      nocookieudp;
+ 	uint16_t	      padding;
+ 	dns_acl_t	     *pad_acl;
+-	unsigned int	      maxbits;
+ 	dns_dns64list_t	      dns64;
+ 	unsigned int	      dns64cnt;
+ 	bool		      usedns64;
+diff --git a/lib/dns/include/dst/dst.h b/lib/dns/include/dst/dst.h
+index f6295793c3..0a9472b284 100644
+--- a/lib/dns/include/dst/dst.h
++++ b/lib/dns/include/dst/dst.h
+@@ -284,13 +284,10 @@ dst_context_sign(dst_context_t *dctx, isc_buffer_t *sig);
+  */
+ 
+ isc_result_t
+-dst_context_verify(dst_context_t *dctx, int maxbits, isc_region_t *sig);
++dst_context_verify(dst_context_t *dctx, isc_region_t *sig);
+ /*%<
+  * Verifies the signature using the data and key stored in the context.
+  *
+- * 'maxbits' specifies the maximum number of bits permitted in the RSA
+- * exponent.
+- *
+  * Requires:
+  * \li	"dctx" is a valid context.
+  * \li	"sig" is a valid region.
+diff --git a/lib/dns/opensslecdsa_link.c b/lib/dns/opensslecdsa_link.c
+index a5f3ef6bf2..c95050020b 100644
+--- a/lib/dns/opensslecdsa_link.c
++++ b/lib/dns/opensslecdsa_link.c
+@@ -838,8 +838,7 @@ err:
+ }
+ 
+ static isc_result_t
+-opensslecdsa_verify(dst_context_t *dctx, int maxbits ISC_ATTR_UNUSED,
+-		    const isc_region_t *sig) {
++opensslecdsa_verify(dst_context_t *dctx, const isc_region_t *sig) {
+ 	isc_result_t ret;
+ 	dst_key_t *key = dctx->key;
+ 	int status;
+diff --git a/lib/dns/openssleddsa_link.c b/lib/dns/openssleddsa_link.c
+index be71476ebd..fd383f688b 100644
+--- a/lib/dns/openssleddsa_link.c
++++ b/lib/dns/openssleddsa_link.c
+@@ -211,8 +211,7 @@ err:
+ }
+ 
+ static isc_result_t
+-openssleddsa_verify(dst_context_t *dctx, int maxbits ISC_ATTR_UNUSED,
+-		    const isc_region_t *sig) {
++openssleddsa_verify(dst_context_t *dctx, const isc_region_t *sig) {
+ 	isc_result_t ret;
+ 	dst_key_t *key = dctx->key;
+ 	int status;
+diff --git a/lib/dns/opensslrsa_link.c b/lib/dns/opensslrsa_link.c
+index 62617cfeeb..cc945a20ea 100644
+--- a/lib/dns/opensslrsa_link.c
++++ b/lib/dns/opensslrsa_link.c
+@@ -43,6 +43,8 @@
+ 		goto err; \
+ 	}
+ 
++#define OPENSSLRSA_MAX_MODULUS_BITS 4096
++
+ typedef struct rsa_components {
+ 	bool bnfree;
+ 	const BIGNUM *e, *n, *d, *p, *q, *dmp1, *dmq1, *iqmp;
+@@ -289,12 +291,12 @@ opensslrsa_sign(dst_context_t *dctx, isc_buffer_t *sig) {
+ static bool
+ opensslrsa_check_exponent_bits(EVP_PKEY *pkey, int maxbits) {
+ 	/* Always use the new API first with OpenSSL 3.x. */
++	int bits = INT_MAX;
+ #if OPENSSL_VERSION_NUMBER >= 0x30000000L
+ 	BIGNUM *e = NULL;
+ 	if (EVP_PKEY_get_bn_param(pkey, OSSL_PKEY_PARAM_RSA_E, &e) == 1) {
+-		int bits = BN_num_bits(e);
++		bits = BN_num_bits(e);
+ 		BN_free(e);
+-		return bits < maxbits;
+ 	}
+ #else
+ 	const RSA *rsa = EVP_PKEY_get0_RSA(pkey);
+@@ -302,15 +304,15 @@ opensslrsa_check_exponent_bits(EVP_PKEY *pkey, int maxbits) {
+ 		const BIGNUM *ce = NULL;
+ 		RSA_get0_key(rsa, NULL, &ce, NULL);
+ 		if (ce != NULL) {
+-			return BN_num_bits(ce) < maxbits;
++			bits = BN_num_bits(ce);
+ 		}
+ 	}
+ #endif
+-	return false;
++	return bits <= maxbits;
+ }
+ 
+ static isc_result_t
+-opensslrsa_verify(dst_context_t *dctx, int maxbits, const isc_region_t *sig) {
++opensslrsa_verify(dst_context_t *dctx, const isc_region_t *sig) {
+ 	dst_key_t *key = NULL;
+ 	int status = 0;
+ 	EVP_MD_CTX *evp_md_ctx = NULL;
+@@ -323,7 +325,8 @@ opensslrsa_verify(dst_context_t *dctx, int maxbits, const isc_region_t *sig) {
+ 	evp_md_ctx = dctx->ctxdata.evp_md_ctx;
+ 	pkey = key->keydata.pkeypair.pub;
+ 
+-	if (maxbits != 0 && !opensslrsa_check_exponent_bits(pkey, maxbits)) {
++	if (!opensslrsa_check_exponent_bits(pkey, OPENSSLRSA_MAX_MODULUS_BITS))
++	{
+ 		return DST_R_VERIFYFAILURE;
+ 	}
+ 
+diff --git a/lib/dns/tsig.c b/lib/dns/tsig.c
+index 3605babee0..88a6cdfd76 100644
+--- a/lib/dns/tsig.c
++++ b/lib/dns/tsig.c
+@@ -1117,7 +1117,7 @@ dns_tsig_verify(isc_buffer_t *source, dns_message_t *msg,
+ 			}
+ 		}
+ 
+-		result = dst_context_verify(ctx, 0, &sig_r);
++		result = dst_context_verify(ctx, &sig_r);
+ 		if (result == DST_R_VERIFYFAILURE) {
+ 			result = DNS_R_TSIGVERIFYFAILURE;
+ 			tsig_log(msg->tsigkey, 2,
+@@ -1420,7 +1420,7 @@ tsig_verify_tcp(isc_buffer_t *source, dns_message_t *msg) {
+ 			goto cleanup_context;
+ 		}
+ 
+-		result = dst_context_verify(msg->tsigctx, 0, &sig_r);
++		result = dst_context_verify(msg->tsigctx, &sig_r);
+ 		if (result == DST_R_VERIFYFAILURE) {
+ 			tsig_log(msg->tsigkey, 2,
+ 				 "signature failed to verify(2)");
+diff --git a/lib/dns/validator.c b/lib/dns/validator.c
+index 1d1b69cccf..db29f30b76 100644
+--- a/lib/dns/validator.c
++++ b/lib/dns/validator.c
+@@ -1349,10 +1349,9 @@ selfsigned_dnskey(dns_validator_t *val) {
+ 					dst_key_free(&dstkey);
+ 					return ISC_R_QUOTA;
+ 				}
+-				result = dns_dnssec_verify(
+-					name, rdataset, dstkey, true,
+-					val->view->maxbits, mctx, &sigrdata,
+-					NULL);
++				result = dns_dnssec_verify(name, rdataset,
++							   dstkey, true, mctx,
++							   &sigrdata, NULL);
+ 				switch (result) {
+ 				case DNS_R_SIGFUTURE:
+ 				case DNS_R_SIGEXPIRED:
+@@ -1417,8 +1416,7 @@ verify(dns_validator_t *val, dst_key_t *key, dns_rdata_t *rdata,
+ 	}
+ again:
+ 	result = dns_dnssec_verify(val->name, val->rdataset, key, ignore,
+-				   val->view->maxbits, val->view->mctx, rdata,
+-				   wild);
++				   val->view->mctx, rdata, wild);
+ 	if ((result == DNS_R_SIGEXPIRED || result == DNS_R_SIGFUTURE) &&
+ 	    val->view->acceptexpired)
+ 	{
+diff --git a/lib/dns/zone.c b/lib/dns/zone.c
+index 177608fa59..179ff78b35 100644
+--- a/lib/dns/zone.c
++++ b/lib/dns/zone.c
+@@ -10315,9 +10315,9 @@ revocable(dns_keyfetch_t *kfetch, dns_rdata_keydata_t *keydata) {
+ 		if (dst_key_alg(dstkey) == sig.algorithm &&
+ 		    dst_key_rid(dstkey) == sig.keyid)
+ 		{
+-			result = dns_dnssec_verify(
+-				keyname, &kfetch->dnskeyset, dstkey, false, 0,
+-				mctx, &sigrr, dns_fixedname_name(&fixed));
++			result = dns_dnssec_verify(keyname, &kfetch->dnskeyset,
++						   dstkey, false, mctx, &sigrr,
++						   dns_fixedname_name(&fixed));
+ 
+ 			dnssec_log(kfetch->zone, ISC_LOG_DEBUG(3),
+ 				   "Confirm revoked DNSKEY is self-signed: %s",
+@@ -10506,8 +10506,7 @@ keyfetch_done(void *arg) {
+ 			}
+ 
+ 			result = dns_dnssec_verify(keyname, dnskeys, dstkey,
+-						   false, 0, mctx, &sigrr,
+-						   NULL);
++						   false, mctx, &sigrr, NULL);
+ 			dst_key_free(&dstkey);
+ 
+ 			dnssec_log(zone, ISC_LOG_DEBUG(3),
+diff --git a/lib/dns/zoneverify.c b/lib/dns/zoneverify.c
+index 7ff78a1582..ab186634ec 100644
+--- a/lib/dns/zoneverify.c
++++ b/lib/dns/zoneverify.c
+@@ -185,7 +185,7 @@ goodsig(const vctx_t *vctx, dns_rdata_t *sigrdata, const dns_name_t *name,
+ 			continue;
+ 		}
+ 		result = dns_dnssec_verify(name, rdataset, dstkeys[key], false,
+-					   0, vctx->mctx, sigrdata, NULL);
++					   vctx->mctx, sigrdata, NULL);
+ 		if (result == ISC_R_SUCCESS || result == DNS_R_FROMWILDCARD) {
+ 			return true;
+ 		}
+diff --git a/lib/ns/query.c b/lib/ns/query.c
+index dddaed6224..c561cd7682 100644
+--- a/lib/ns/query.c
++++ b/lib/ns/query.c
+@@ -2447,8 +2447,7 @@ verify(dst_key_t *key, dns_name_t *name, dns_rdataset_t *rdataset,
+ 
+ again:
+ 	result = dns_dnssec_verify(name, rdataset, key, ignore,
+-				   client->view->maxbits, client->manager->mctx,
+-				   rdata, NULL);
++				   client->manager->mctx, rdata, NULL);
+ 	if (result == DNS_R_SIGEXPIRED && client->view->acceptexpired) {
+ 		ignore = true;
+ 		goto again;
+diff --git a/tests/dns/dst_test.c b/tests/dns/dst_test.c
+index a98c40b00d..225706ffea 100644
+--- a/tests/dns/dst_test.c
++++ b/tests/dns/dst_test.c
+@@ -193,7 +193,7 @@ check_sig(const char *datapath, const char *sigpath, const char *keyname,
+ 
+ 	result = dst_context_adddata(ctx, &datareg);
+ 	assert_int_equal(result, ISC_R_SUCCESS);
+-	result = dst_context_verify(ctx, 0, &sigreg);
++	result = dst_context_verify(ctx, &sigreg);
+ 
+ 	/*
+ 	 * Compute the expected signature and emit it
+diff --git a/tests/dns/rsa_test.c b/tests/dns/rsa_test.c
+index 09aee74631..95182ad6fe 100644
+--- a/tests/dns/rsa_test.c
++++ b/tests/dns/rsa_test.c
+@@ -155,7 +155,7 @@ ISC_RUN_TEST_IMPL(isc_rsa_verify) {
+ 
+ 		r.base = sigsha1;
+ 		r.length = 256;
+-		ret = dst_context_verify(ctx, 0, &r);
++		ret = dst_context_verify(ctx, &r);
+ 		assert_int_equal(ret, ISC_R_SUCCESS);
+ 
+ 		dst_context_destroy(&ctx);
+@@ -176,7 +176,7 @@ ISC_RUN_TEST_IMPL(isc_rsa_verify) {
+ 
+ 	r.base = sigsha256;
+ 	r.length = 256;
+-	ret = dst_context_verify(ctx, 0, &r);
++	ret = dst_context_verify(ctx, &r);
+ 	assert_int_equal(ret, ISC_R_SUCCESS);
+ 
+ 	dst_context_destroy(&ctx);
+@@ -196,7 +196,7 @@ ISC_RUN_TEST_IMPL(isc_rsa_verify) {
+ 
+ 	r.base = sigsha512;
+ 	r.length = 256;
+-	ret = dst_context_verify(ctx, 0, &r);
++	ret = dst_context_verify(ctx, &r);
+ 	assert_int_equal(ret, ISC_R_SUCCESS);
+ 
+ 	dst_context_destroy(&ctx);
+-- 
+2.43.0
+

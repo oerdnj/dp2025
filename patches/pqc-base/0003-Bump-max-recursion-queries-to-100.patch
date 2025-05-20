@@ -1,0 +1,25 @@
+From db3e80aeccf81b6aad7477614a6ed398d68cf198 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Ond=C5=99ej=20Sur=C3=BD?= <ondrej@isc.org>
+Date: Tue, 18 Mar 2025 05:38:12 +0100
+Subject: [PATCH 3/5] Bump max-recursion-queries to 100
+
+---
+ bin/named/config.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/bin/named/config.c b/bin/named/config.c
+index eb93c8a5f3..3034e6e4e1 100644
+--- a/bin/named/config.c
++++ b/bin/named/config.c
+@@ -172,7 +172,7 @@ options {\n\
+ 	max-clients-per-query 100;\n\
+ 	max-ncache-ttl 10800; /* 3 hours */\n\
+ 	max-recursion-depth 7;\n\
+-	max-recursion-queries 50;\n\
++	max-recursion-queries 100;\n\
+ 	max-query-count 200;\n\
+ 	max-query-restarts 11;\n\
+ 	max-stale-ttl 86400; /* 1 day */\n\
+-- 
+2.43.0
+

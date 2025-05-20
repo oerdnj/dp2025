@@ -1,0 +1,118 @@
+From 499f56ed03347efdb0b7e0f09f5752bc457b249d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Ond=C5=99ej=20Sur=C3=BD?= <ondrej@isc.org>
+Date: Tue, 18 Mar 2025 05:41:27 +0100
+Subject: [PATCH 4/4] Bump the EDNS(0) buffer size to 1452
+
+---
+ bin/dig/dighost.h       | 2 +-
+ bin/named/config.c      | 4 ++--
+ bin/nsupdate/nsupdate.c | 2 +-
+ bin/tools/mdig.c        | 2 +-
+ lib/dns/message.c       | 2 +-
+ lib/dns/view.c          | 2 +-
+ lib/ns/server.c         | 2 +-
+ 7 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/bin/dig/dighost.h b/bin/dig/dighost.h
+index f1670280b4..88363e54ed 100644
+--- a/bin/dig/dighost.h
++++ b/bin/dig/dighost.h
+@@ -74,7 +74,7 @@
+ #define LOOKUP_LIMIT 64
+ 
+ #define DEFAULT_EDNS_VERSION 0
+-#define DEFAULT_EDNS_BUFSIZE 1232
++#define DEFAULT_EDNS_BUFSIZE 1452
+ 
+ #define DEFAULT_HTTPS_QUERY "?dns="
+ 
+diff --git a/bin/named/config.c b/bin/named/config.c
+index 3034e6e4e1..8fc7d5b695 100644
+--- a/bin/named/config.c
++++ b/bin/named/config.c
+@@ -54,7 +54,7 @@ options {\n\
+ #	directory <none>\n\
+ 	dnssec-policy \"none\";\n\
+ 	dump-file \"named_dump.db\";\n\
+-	edns-udp-size 1232;\n"
++	edns-udp-size 1452;\n"
+ #if defined(HAVE_GEOIP2)
+ 			    "\
+ 	geoip-directory \"" MAXMINDDB_PREFIX "/share/GeoIP\";\n"
+@@ -69,7 +69,7 @@ options {\n\
+ 	match-mapped-addresses no;\n\
+ 	max-ixfr-ratio 100%;\n\
+ 	max-rsa-exponent-size 0; /* no limit */\n\
+-	max-udp-size 1232;\n\
++	max-udp-size 1452;\n\
+ 	memstatistics-file \"named.memstats\";\n\
+ 	nocookie-udp-size 4096;\n\
+ 	notify-rate 20;\n\
+diff --git a/bin/nsupdate/nsupdate.c b/bin/nsupdate/nsupdate.c
+index 51015dc065..7f76b407d2 100644
+--- a/bin/nsupdate/nsupdate.c
++++ b/bin/nsupdate/nsupdate.c
+@@ -102,7 +102,7 @@
+ 
+ #define DNSDEFAULTPORT 53
+ 
+-#define DEFAULT_EDNS_BUFSIZE 1232
++#define DEFAULT_EDNS_BUFSIZE 1452
+ 
+ /* Number of addresses to request from isc_getaddresses() */
+ #define MAX_SERVERADDRS 4
+diff --git a/bin/tools/mdig.c b/bin/tools/mdig.c
+index 87a4513e46..28e061d98d 100644
+--- a/bin/tools/mdig.c
++++ b/bin/tools/mdig.c
+@@ -617,7 +617,7 @@ sendquery(struct query *query) {
+ 		unsigned char cookie[40];
+ 
+ 		if (query->udpsize == 0) {
+-			query->udpsize = 1232;
++			query->udpsize = 1452;
+ 		}
+ 		if (query->edns < 0) {
+ 			query->edns = 0;
+diff --git a/lib/dns/message.c b/lib/dns/message.c
+index 9eaeb990f0..ae413763d6 100644
+--- a/lib/dns/message.c
++++ b/lib/dns/message.c
+@@ -121,7 +121,7 @@ hexdump(const char *msg, const char *msg2, void *base, size_t len) {
+  * of various block allocations used within the server.
+  * XXXMLG These should come from a config setting.
+  */
+-#define SCRATCHPAD_SIZE	   1232
++#define SCRATCHPAD_SIZE	   1452
+ #define NAME_FILLCOUNT	   1024
+ #define NAME_FREEMAX	   8 * NAME_FILLCOUNT
+ #define OFFSET_COUNT	   4
+diff --git a/lib/dns/view.c b/lib/dns/view.c
+index 2d27d0d949..9a20360712 100644
+--- a/lib/dns/view.c
++++ b/lib/dns/view.c
+@@ -82,7 +82,7 @@
+ /*%
+  * Default EDNS0 buffer size
+  */
+-#define DEFAULT_EDNS_BUFSIZE 1232
++#define DEFAULT_EDNS_BUFSIZE 1452
+ 
+ void
+ dns_view_create(isc_mem_t *mctx, isc_loopmgr_t *loopmgr,
+diff --git a/lib/ns/server.c b/lib/ns/server.c
+index 7eb27138df..fe0d721acd 100644
+--- a/lib/ns/server.c
++++ b/lib/ns/server.c
+@@ -44,7 +44,7 @@ ns_server_create(isc_mem_t *mctx, ns_matchview_t matchingview,
+ 
+ 	sctx = isc_mem_get(mctx, sizeof(*sctx));
+ 	*sctx = (ns_server_t){
+-		.udpsize = 1232,
++		.udpsize = 1452,
+ 		.transfer_tcp_message_size = 20480,
+ 
+ 		.fuzztype = isc_fuzz_none,
+-- 
+2.43.0
+

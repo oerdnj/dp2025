@@ -1,0 +1,43 @@
+From 71f608eae797b76c8bf5bfd00f92099ec356465a Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Ond=C5=99ej=20Sur=C3=BD?= <ondrej@isc.org>
+Date: Wed, 12 Mar 2025 12:33:34 +0100
+Subject: [PATCH 7/7] Add the SQIsign root zone key
+
+---
+ bind.keys | 22 +++-------------------
+ 1 file changed, 3 insertions(+), 19 deletions(-)
+
+diff --git a/bind.keys b/bind.keys
+index dffbea5d6b..73a482cc00 100644
+--- a/bind.keys
++++ b/bind.keys
+@@ -37,23 +37,7 @@
+ # anchor information for the root zone.
+ 
+ trust-anchors {
+-        # This key (20326) was published in the root zone in 2017, and
+-        # is scheduled to be phased out starting in 2025. It will remain
+-        # in the root zone until some time after its successor key has
+-        # been activated. It will remain this file until it is removed
+-        # from the root zone.
+-
+-        . initial-key 257 3 8 "AwEAAaz/tAm8yTn4Mfeh5eyI96WSVexTBAvkMgJzkKTOiW1vkIbzxeF3
+-                +/4RgWOq7HrxRixHlFlExOLAJr5emLvN7SWXgnLh4+B5xQlNVz8Og8kv
+-                ArMtNROxVQuCaSnIDdD5LKyWbRd2n9WGe2R8PzgCmr3EgVLrjyBxWezF
+-                0jLHwVN8efS3rCj/EWgvIWgb9tarpVUDK/b58Da+sqqls3eNbuv7pr+e
+-                oZG+SrDK6nWeL3c6H5Apxz7LjVc1uTIdsIXxuOLYA4/ilBmSVIzuDWfd
+-                RUfhHdY6+cn8HFRm+2hM8AnXGXws9555KrUB5qihylGa8subX2Nn6UwN
+-                R1AkUTV74bU=";
+-        # This key (38696) will be pre-published in the root zone in 2025
+-        # and is scheduled to begin signing in late 2026. At that time,
+-        # servers which were already using the old key (20326) should roll
+-        # seamlessly to this new one via RFC 5011 rollover.
+-        . initial-ds 38696 8 2 "683D2D0ACB8C9B712A1948B27F741219298D0A450D612C483AF444A
+-        4C0FB2B16";
++        . initial-key 257 3 8 "AwEAAaz/tAm8yTn4Mfeh5eyI96WSVexTBAvkMgJzkKTOiW1vkIbzxeF3 +/4RgWOq7HrxRixHlFlExOLAJr5emLvN7SWXgnLh4+B5xQlNVz8Og8kv ArMtNROxVQuCaSnIDdD5LKyWbRd2n9WGe2R8PzgCmr3EgVLrjyBxWezF 0jLHwVN8efS3rCj/EWgvIWgb9tarpVUDK/b58Da+sqqls3eNbuv7pr+e oZG+SrDK6nWeL3c6H5Apxz7LjVc1uTIdsIXxuOLYA4/ilBmSVIzuDWfd RUfhHdY6+cn8HFRm+2hM8AnXGXws9555KrUB5qihylGa8subX2Nn6UwN R1AkUTV74bU=";
++        . initial-ds 38696 8 2 "683D2D0ACB8C9B712A1948B27F741219298D0A450D612C483AF444A 4C0FB2B16";
++	. initial-key 257 3 125 "HC93QFY+XuGhE+gHrUv0gFoK/CsjtLDUnyOAAYWI6ALE/SGO24KwJt/1 01zCkDjd26LiqYmwHizJHQ0xhf1dAQs=";
+ };
+-- 
+2.43.0
+

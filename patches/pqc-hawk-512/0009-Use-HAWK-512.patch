@@ -1,0 +1,86 @@
+From a367e63358d13c2a9010253ec5775a5800d7c8ab Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Ond=C5=99ej=20Sur=C3=BD?= <ondrej@isc.org>
+Date: Fri, 14 Mar 2025 11:03:08 +0100
+Subject: [PATCH 09/10] Use HAWK-512
+
+---
+ lib/dns/hawk_link.c             | 17 +++++++++--------
+ lib/dns/include/dns/keyvalues.h |  8 +++++---
+ 2 files changed, 14 insertions(+), 11 deletions(-)
+
+diff --git a/lib/dns/hawk_link.c b/lib/dns/hawk_link.c
+index 9f0ddffdc2..10b4889878 100644
+--- a/lib/dns/hawk_link.c
++++ b/lib/dns/hawk_link.c
+@@ -68,7 +68,7 @@ dst__hawk_sign(dst_context_t *dctx, isc_buffer_t *sig) {
+ 	isc_result_t result = ISC_R_SUCCESS;
+ 	dst_key_t *key = dctx->key;
+ 	isc_region_t sigreg;
+-	uint8_t tmp[HAWK_TMPSIZE_SIGN(8)];
++	uint8_t tmp[HAWK_TMPSIZE_SIGN(HAWK_LOGN)];
+ 
+ 	isc_buffer_availableregion(sig, &sigreg);
+ 	if (sigreg.length < DNS_SIG_HAWKSIZE) {
+@@ -76,9 +76,10 @@ dst__hawk_sign(dst_context_t *dctx, isc_buffer_t *sig) {
+ 		goto done;
+ 	}
+ 
+-	int status = hawk_sign_finish(
+-		8, dst__hawk_rng, NULL, sig->base, &dctx->ctxdata.shake_context,
+-		key->keydata.keypair.priv, tmp, sizeof(tmp));
++	int status = hawk_sign_finish(HAWK_LOGN, dst__hawk_rng, NULL, sig->base,
++				      &dctx->ctxdata.shake_context,
++				      key->keydata.keypair.priv, tmp,
++				      sizeof(tmp));
+ 	if (status == 0) {
+ 		result = DST_R_SIGNFAILURE;
+ 		isc_log_write(dctx->category, DNS_LOGMODULE_CRYPTO,
+@@ -101,7 +102,7 @@ dst__hawk_verify(dst_context_t *dctx, const isc_region_t *sig) {
+ 
+ 	isc_result_t result = ISC_R_SUCCESS;
+ 	dst_key_t *key = dctx->key;
+-	uint8_t tmp[HAWK_TMPSIZE_VERIFY_FAST(8)];
++	uint8_t tmp[HAWK_TMPSIZE_VERIFY_FAST(HAWK_LOGN)];
+ 
+ 	if (sig->length != DNS_SIG_HAWKSIZE) {
+ 		result = DST_R_VERIFYFAILURE;
+@@ -109,7 +110,7 @@ dst__hawk_verify(dst_context_t *dctx, const isc_region_t *sig) {
+ 	}
+ 
+ 	int status = hawk_verify_finish(
+-		8, sig->base, sig->length, &dctx->ctxdata.shake_context,
++		HAWK_LOGN, sig->base, sig->length, &dctx->ctxdata.shake_context,
+ 		key->keydata.keypair.pub, DNS_KEY_HAWKSIZE, tmp, sizeof(tmp));
+ 	if (status == 0) {
+ 		result = DST_R_VERIFYFAILURE;
+@@ -168,9 +169,9 @@ dst__hawk_generate(dst_key_t *key, int unused ISC_ATTR_UNUSED,
+ 	isc_result_t result = ISC_R_UNSET;
+ 	uint8_t *pk = isc_mem_get(key->mctx, DNS_KEY_HAWKSIZE);
+ 	uint8_t *sk = isc_mem_get(key->mctx, DNS_SEC_HAWKSIZE);
+-	uint8_t tmp[HAWK_TMPSIZE_KEYGEN(8)];
++	uint8_t tmp[HAWK_TMPSIZE_KEYGEN(HAWK_LOGN)];
+ 
+-	int status = hawk_keygen(8, sk, pk, dst__hawk_rng, NULL, tmp,
++	int status = hawk_keygen(HAWK_LOGN, sk, pk, dst__hawk_rng, NULL, tmp,
+ 				 sizeof(tmp));
+ 	if (status == 0) {
+ 		result = DST_R_CRYPTOFAILURE;
+diff --git a/lib/dns/include/dns/keyvalues.h b/lib/dns/include/dns/keyvalues.h
+index 817d7d23e6..1c999b6fdd 100644
+--- a/lib/dns/include/dns/keyvalues.h
++++ b/lib/dns/include/dns/keyvalues.h
+@@ -118,6 +118,8 @@ enum {
+ #define HAWK_SIG_SIZE(logn) \
+ 	(249u + 306u * (2u >> (10 - (logn))) + 360u * ((1u >> (10 - (logn)))))
+ 
+-#define DNS_SIG_HAWKSIZE HAWK_SIG_SIZE(8)
+-#define DNS_KEY_HAWKSIZE HAWK_PUBKEY_SIZE(8)
+-#define DNS_SEC_HAWKSIZE HAWK_PRIVKEY_SIZE(8)
++#define HAWK_LOGN 9
++
++#define DNS_SIG_HAWKSIZE HAWK_SIG_SIZE(HAWK_LOGN)
++#define DNS_KEY_HAWKSIZE HAWK_PUBKEY_SIZE(HAWK_LOGN)
++#define DNS_SEC_HAWKSIZE HAWK_PRIVKEY_SIZE(HAWK_LOGN)
+-- 
+2.43.0
+

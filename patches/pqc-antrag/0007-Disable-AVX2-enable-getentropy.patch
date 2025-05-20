@@ -1,0 +1,54 @@
+From 68a5a29c1b0f468bac0ee62f1a37ea20f581290b Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Ond=C5=99ej=20Sur=C3=BD?= <ondrej@isc.org>
+Date: Sun, 4 May 2025 13:04:09 +0200
+Subject: [PATCH 7/9] Disable AVX2, enable getentropy()
+
+---
+ lib/dns/antrag/falcon/config.h | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/lib/dns/antrag/falcon/config.h b/lib/dns/antrag/falcon/config.h
+index 55e6c7cae3..21d174a05c 100644
+--- a/lib/dns/antrag/falcon/config.h
++++ b/lib/dns/antrag/falcon/config.h
+@@ -118,8 +118,9 @@
+  * and 64-bit modes), and run only on systems that offer the AVX2
+  * opcodes. Some operations leverage AVX2 for better performance.
+  *
+- */
+ #define FALCON_AVX2   1
++ */
++#undef FALCON_AVX2
+ 
+ /*
+  * Enable use of FMA intrinsics. This setting has any effect only if
+@@ -131,8 +132,9 @@
+  * and signatures might theoretically change, but only with low probability,
+  * less than 2^(-40); produced signatures are still safe and interoperable).
+  *
++#define FALCON_FMA 1
+  */
+-#define FALCON_FMA   1
++#undef FALCON_FMA
+ 
+ /*
+  * Assert that the platform uses little-endian encoding. If enabled,
+@@ -169,7 +171,7 @@
+  * setting is not enabled by default.
+  *
+  */
+-#define FALCON_KG_CHACHA20   1
++#define FALCON_KG_CHACHA20 1
+ 
+ /*
+  * Use an explicit OS-provided source of randomness for seeding (for the
+@@ -199,5 +201,6 @@
+ #define FALCON_RAND_URANDOM      1
+ #define FALCON_RAND_WIN32        1
+  */
++#define FALCON_RAND_GETENTROPY 1
+ 
+ #endif
+-- 
+2.43.0
+

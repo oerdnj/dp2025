@@ -1,0 +1,25 @@
+From d643f48fdabdce125b696ca3b3ba0fb090a303db Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Ond=C5=99ej=20Sur=C3=BD?= <ondrej@isc.org>
+Date: Fri, 2 May 2025 19:34:41 +0200
+Subject: [PATCH 07/10] fixup! WIP: Add HAWK support to BIND 9
+
+---
+ lib/dns/include/dns/keyvalues.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/dns/include/dns/keyvalues.h b/lib/dns/include/dns/keyvalues.h
+index c20717f88f..817d7d23e6 100644
+--- a/lib/dns/include/dns/keyvalues.h
++++ b/lib/dns/include/dns/keyvalues.h
+@@ -72,7 +72,7 @@ enum {
+ 	DNS_KEYALG_ECDSA384 = 14,
+ 	DNS_KEYALG_ED25519 = 15,
+ 	DNS_KEYALG_ED448 = 16,
+-	DNS_KEYALG_HAWK = 121,
++	DNS_KEYALG_HAWK = 123,
+ 	DNS_KEYALG_INDIRECT = 252,
+ 	DNS_KEYALG_PRIVATEDNS = 253,
+ 	DNS_KEYALG_PRIVATEOID = 254, /*%< Key begins with OID giving alg */
+-- 
+2.43.0
+

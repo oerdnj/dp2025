@@ -1,0 +1,32 @@
+From 4aaaa351cba7b58411b483316e0d4e71b2c7d5c9 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Ond=C5=99ej=20Sur=C3=BD?= <ondrej@isc.org>
+Date: Sun, 4 May 2025 13:07:45 +0200
+Subject: [PATCH 8/9] ANTRAG: seed the random generator
+
+---
+ lib/dns/dst_api.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/lib/dns/dst_api.c b/lib/dns/dst_api.c
+index e76e41ece5..c53167bda5 100644
+--- a/lib/dns/dst_api.c
++++ b/lib/dns/dst_api.c
+@@ -29,6 +29,7 @@
+ 
+ /*! \file */
+ 
++#include <antrag/antrag/randombytes.h>
+ #include <errno.h>
+ #include <fcntl.h>
+ #include <inttypes.h>
+@@ -190,6 +191,7 @@ static isc_mem_t *dst__mctx = NULL;
+ 
+ void
+ dst__lib_initialize(void) {
++	seed_rng();
+ 	isc_mem_create(&dst__mctx);
+ 
+ 	dst__hmacmd5_init(&dst_t_func[DST_ALG_HMACMD5]);
+-- 
+2.43.0
+
